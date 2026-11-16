@@ -1,5 +1,5 @@
-/* Koinly Tools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
-/* Koinly Tools · elementi di risposta al questionario dell'Agenzia delle Entrate sulle cripto-attività, dagli elaborati Koinly.
+/* CryptoMesTools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
+/* CryptoMesTools · elementi di risposta al questionario dell'Agenzia delle Entrate sulle cripto-attività, dagli elaborati Koinly.
    Domande tipo (inviti ex art. 32 DPR 600/1973):
    1 modalità di acquisto e intermediari; 2 movimentazione bancaria; 3 elenco dei wallet alle date, tipologia, indirizzi;
    4 elenco delle transazioni con tipologia e transaction ID; 5 composizione e valore del saldo di ogni wallet;

@@ -1,5 +1,5 @@
-/* Koinly Tools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
-/* Koinly Tools · giorni di detenzione delle cripto-attività in un anno (per RW e IVACA).
+/* CryptoMesTools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
+/* CryptoMesTools · giorni di detenzione delle cripto-attività in un anno (per RW e IVACA).
    Dati: CSV delle transazioni Koinly (backup "backup_transactions_koinly.csv" o "transaction history").
    Regole dello studio:
    - totale di tutti i wallet per ciascuna cripto; escluse le valute tradizionali, incluse le stablecoin;

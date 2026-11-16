@@ -1,5 +1,5 @@
-/* Koinly Tools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
-/* Koinly Tools · lettura anonimizzata degli estratti conto bancari (testo dei PDF).
+/* CryptoMesTools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
+/* CryptoMesTools · lettura anonimizzata degli estratti conto bancari (testo dei PDF).
    Privacy: di ogni riga si conservano SOLO data, importo, segno e il nome dell'exchange riconosciuto.
    Le righe che non riguardano cripto-attività sono scartate alla lettura (se ne conta solo il numero);
    anche nelle righe tenute il testo originale (nomi, IBAN, indirizzi, causali) non viene mai conservato né mostrato. */

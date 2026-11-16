@@ -1,5 +1,5 @@
-/* Koinly Tools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
-/* Koinly Tools · pratica con l'Agenzia delle Entrate: dall'invito (art. 32 DPR 600/1973) allo schema di atto (art. 6-bis L. 212/2000)
+/* CryptoMesTools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
+/* CryptoMesTools · pratica con l'Agenzia delle Entrate: dall'invito (art. 32 DPR 600/1973) allo schema di atto (art. 6-bis L. 212/2000)
    e all'atto impositivo. Lettura del PDF dell'atto (testo estratto con pdf.js), scadenze, scenari delle osservazioni e testo delle
    osservazioni nello schema dello studio.
    Metodo dello studio per le osservazioni allo schema di atto: i dati sono quelli dell'Ufficio (stesse operazioni, stessi controvalori,

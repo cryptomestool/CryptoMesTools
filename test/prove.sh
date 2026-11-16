@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Esegue le prove di Koinly Tools con JavaScriptCore del Mac (Node non serve): test/prove.sh [nome ...]
+# Esegue le prove di CryptoMesTools con JavaScriptCore del Mac (Node non serve): test/prove.sh [nome ...]
 # Senza argomenti esegue tutte le prove di test/*.test.js.
 cd "${0:a:h}/.." || exit 1
 JSC=/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc

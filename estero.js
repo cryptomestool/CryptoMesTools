@@ -1,5 +1,5 @@
-/* Koinly Tools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
-/* Koinly Tools · motore comune dei broker esteri: dai dati di un intermediario in forma normalizzata calcola, per anno,
+/* CryptoMesTools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
+/* CryptoMesTools · motore comune dei broker esteri: dai dati di un intermediario in forma normalizzata calcola, per anno,
    i quadri RT (sezione al 26%), RM (redditi di capitale esteri) e RW (con IVAFE e IVACA) e i codici F24.
    Ogni broker ha un suo lettore (etoro.js per il rendiconto eToro, la funzione leggiCsv qui sotto per il modello generico)
    che produce questa forma, tutta in euro:

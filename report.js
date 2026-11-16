@@ -1,5 +1,5 @@
-/* Koinly Tools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
-/* Koinly Tools · lettura degli altri report Koinly in CSV (Income, Expenses, Gifts/Donations/Lost assets, Other gains).
+/* CryptoMesTools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
+/* CryptoMesTools · lettura degli altri report Koinly in CSV (Income, Expenses, Gifts/Donations/Lost assets, Other gains).
    Dal 2023 i proventi dell'Income report entrano nel quadro RT delle cripto (escludibili per anno); il netto dell'Other gains
    si riporta, a scelta dello studio, nel quadro RT al 26% o nel quadro RM degli altri redditi. Gli altri report sono riepiloghi e riscontri.
    I report possono essere in italiano o in inglese e con numeri in formato 1,234.56 oppure 1.234,56. */
@@ -19,8 +19,8 @@
   /* report riconosciuti ma letti altrove o non ancora usati */
   var ALTRI = [
     [/saldi al|holdings/i, "è un report dei saldi: va negli spazi «Saldi a inizio anno» o «Saldi a fine anno»."],
-    [/plusvalenze|capital gains/i, "il Capital gains report non è ancora usato da Koinly Tools."],
-    [/buy\/sell|acquisti e vendite/i, "il Buy/sell report non è ancora usato da Koinly Tools."]
+    [/plusvalenze|capital gains/i, "il Capital gains report non è ancora usato da CryptoMesTools."],
+    [/buy\/sell|acquisti e vendite/i, "il Buy/sell report non è ancora usato da CryptoMesTools."]
   ];
   /* colonne in italiano e in inglese */
   var COLONNE = {

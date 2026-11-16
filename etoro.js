@@ -1,5 +1,5 @@
-/* Koinly Tools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
-/* Koinly Tools · lettura del rendiconto eToro («Account statement» in PDF, versione italiana o inglese) e riepilogo per anno
+/* CryptoMesTools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
+/* CryptoMesTools · lettura del rendiconto eToro («Account statement» in PDF, versione italiana o inglese) e riepilogo per anno
    dei dati letti: posizioni chiuse per categoria, trasferimenti al wallet cripto, dividendi, airdrop, portafoglio e saldo.
    I dati si portano nella forma comune dei broker esteri (normalizza) e i quadri RT (sezione al 26%), RM (dividendi esteri)
    e RW (con IVAFE e IVACA) di ogni anno si calcolano con il motore comune (estero.js).

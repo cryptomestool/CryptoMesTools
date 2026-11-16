@@ -77,4 +77,24 @@ t("Ethereum: ETH, token, scambio, transazione non riuscita, spam", () => {
   assert.equal(m[2].tag, "cost"); assert.ok(/non riuscita/.test(m[2].descrizione)); assert.equal(D.decStr(m[2].voci[0].q), "-0.000021");
 });
 
-console.log(n + " prove superate");
+t("riconoscimento di chiavi e indirizzi per la scelta della blockchain", () => {
+  assert.equal(O.riconosciChiave("zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs"), "bitcoin-chiave");
+  assert.equal(O.riconosciChiave("bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu"), "bitcoin-indirizzo");
+  assert.equal(O.riconosciChiave("1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA"), "bitcoin-indirizzo");
+  assert.equal(O.riconosciChiave("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"), "evm");
+  assert.equal(O.riconosciChiave("0x123"), "");
+  assert.ok(O.RETI.optimism && O.RETI.avalanche && O.RETI.zksync && !O.RETI.gnosis);
+});
+let errEvm = null;
+O.leggiEvm("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", "ethereum", { attesa: 1, json: () => Promise.resolve({ status: "0", message: "NOTOK", result: "Max rate limit reached" }) })
+  .then(() => { errEvm = "nessun errore"; }, (e) => { errEvm = e.message; })
+  .then(() => {
+    t("esploratore EVM: un errore del servizio non diventa «nessuna transazione»", () => { assert.equal(errEvm, "Ethereum: Max rate limit reached"); });
+    return O.leggiEvm("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", "base", { json: () => Promise.resolve({ status: "0", message: "No transactions found", result: [] }) });
+  })
+  .then((r) => {
+    t("esploratore EVM: indirizzo senza transazioni", () => { assert.equal(r.normali.length + r.token.length + r.interne.length, 0); });
+    console.log(n + " prove superate");
+  })
+  .catch((e) => console.log("ERRORE", e && e.stack || e));
+

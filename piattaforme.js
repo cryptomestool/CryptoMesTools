@@ -1,5 +1,5 @@
-/* Koinly Tools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
-/* Koinly Tools · lettura diretta dei CSV delle piattaforme (senza Koinly).
+/* CryptoMesTools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
+/* CryptoMesTools · lettura diretta dei CSV delle piattaforme (senza Koinly).
    Ogni lettore trasforma il file nello stesso elenco di movimenti prodotto da KoinlyDetenzione.leggiTransazioni,
    così costi, detenzione, soglia, RW, RT e sanzioni restano invariati.
    Tipi come Koinly: "trade" (permuta, acquisto, vendita), "deposit", "withdrawal"; etichette: reward, lending_interest,

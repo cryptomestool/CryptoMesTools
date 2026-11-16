@@ -1,5 +1,5 @@
-/* Koinly Tools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
-/* Koinly Tools · ricostruzione dei costi di carico con strati LIFO globali, dall'origine.
+/* CryptoMesTools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
+/* CryptoMesTools · ricostruzione dei costi di carico con strati LIFO globali, dall'origine.
    Si parte dalla prima transazione dello storico Koinly (non dai saldi di inizio anno) e si costruisce, per ogni cripto,
    una pila di strati di costo unica per tutti i wallet e per tutti gli anni (LIFO globale, continuo):
    - acquisto con valuta tradizionale: strato al costo pagato, commissioni comprese;

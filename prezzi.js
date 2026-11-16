@@ -1,5 +1,5 @@
-/* Koinly Tools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
-/* Koinly Tools · prezzi in euro per le transazioni lette senza Koinly (piattaforme e blockchain).
+/* CryptoMesTools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
+/* CryptoMesTools · prezzi in euro per le transazioni lette senza Koinly (piattaforme e blockchain).
    - Cripto: prezzo di chiusura giornaliero (UTC) delle coppie Binance in euro (es. BTCEUR); dove la coppia in euro manca
      o non copre quel giorno, la coppia in USDT convertita in euro al cambio BCE del giorno (USDT considerato pari al dollaro).
    - Valute tradizionali e stablecoin legate al dollaro: cambio di riferimento BCE (api.frankfurter.dev); nei giorni senza
@@ -16,6 +16,10 @@
   var FIAT_BCE = ["USD", "GBP", "CHF", "JPY", "CAD", "AUD"], USD_STABLE = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "USDP", "FDUSD", "PYUSD", "PAX", "GUSD", "UST", "USDE"];
   var EUR_STABLE = ["EURC", "EURT", "EURI", "EURS", "AEUR"];
   var GIORNO = 86400000;
+  /* token che valgono come un'altra cripto (versioni «wrapped» o ponte delle reti EVM) e nomi precedenti (POL era MATIC fino al 2024) */
+  var SINONIMI = { WETH: "ETH", WBTC: "BTC", BTCB: "BTC", CBBTC: "BTC", WAVAX: "AVAX", WMATIC: "MATIC", WPOL: "POL", WBNB: "BNB", STETH: "ETH", WSTETH: "ETH", "USDC.E": "USDC", USDBC: "USDC", "USDT.E": "USDT", "DAI.E": "DAI", "WETH.E": "ETH" };
+  var RIPIEGO = { POL: "MATIC" };
+  function norm(s) { s = String(s || "").toUpperCase().trim(); return SINONIMI[s] || s; }
 
   function giorno(ts) { return new Date(ts).toISOString().slice(0, 10); }
   function ms(g) { return Date.UTC(+g.slice(0, 4), +g.slice(5, 7) - 1, +g.slice(8, 10)); }
@@ -48,7 +52,7 @@
     async function prepara(richieste) {
       var perSimbolo = {}, min = null, max = null;
       richieste.forEach(function (x) {
-        var s = String(x.simbolo || "").toUpperCase(); if (!s || s === "EUR") return;
+        var s = norm(x.simbolo); if (!s || s === "EUR") return;
         var p = perSimbolo[s] || (perSimbolo[s] = { da: x.giorno, a: x.giorno });
         if (x.giorno < p.da) p.da = x.giorno; if (x.giorno > p.a) p.a = x.giorno;
         if (!min || x.giorno < min) min = x.giorno; if (!max || x.giorno > max) max = x.giorno;
@@ -66,6 +70,14 @@
         // la coppia in USDT serve se quella in euro manca o non copre tutto l'intervallo
         var giorniEur = eur ? Object.keys(eur).sort() : [];
         if (!giorniEur.length || giorniEur[0] > p.da || giorniEur[giorniEur.length - 1] < p.a) { try { usdt = await caricaSerie(s + "USDT", p.da, p.a); } catch (e) { usdt = null; } }
+        // nome precedente della stessa cripto per i giorni non coperti (es. POL → MATIC)
+        if (RIPIEGO[s]) {
+          var pr = function (serieDa) { return serieDa ? Object.keys(serieDa).sort()[0] : null; }, inizio = [pr(eur), pr(usdt)].filter(Boolean).sort()[0];
+          if (!inizio || inizio > p.da) {
+            var vecchia = null; try { vecchia = await caricaSerie(RIPIEGO[s] + "USDT", p.da, p.a); } catch (e) { vecchia = null; }
+            if (vecchia) { usdt = usdt || {}; Object.keys(vecchia).forEach(function (g) { if (usdt[g] == null && !(eur && eur[g] != null)) usdt[g] = vecchia[g]; }); }
+          }
+        }
         serie[s] = { da: p.da, a: p.a, eur: eur || {}, usdt: usdt || {} };
         if (!giorniEur.length && !(usdt && Object.keys(usdt).length)) mancanti[s] = true;
       }
@@ -78,13 +90,14 @@
     }
     /* { eur, fonte } oppure null */
     function prezzo(simbolo, g) {
-      var s = String(simbolo || "").toUpperCase();
+      var s = norm(simbolo);
       if (s === "EUR" || EUR_STABLE.indexOf(s) >= 0) return { eur: 1, fonte: s === "EUR" ? "euro" : "stablecoin in euro (1 €)" };
       if (FIAT_BCE.indexOf(s) >= 0) { var c = cambio(s, g); return c ? { eur: c, fonte: "cambio BCE" } : null; }
       if (USD_STABLE.indexOf(s) >= 0) { var u = cambio("USD", g); return u ? { eur: u, fonte: "stablecoin al cambio BCE del dollaro" } : null; }
       var x = serie[s]; if (!x) return null;
-      if (x.eur[g] != null) return { eur: x.eur[g], fonte: "Binance " + s + "/EUR" };
-      if (x.usdt[g] != null) { var cu = cambio("USD", g); if (cu) return { eur: x.usdt[g] * cu, fonte: "Binance " + s + "/USDT al cambio BCE" }; }
+      var nota = s !== String(simbolo || "").toUpperCase().trim() ? " (come " + s + ")" : "";
+      if (x.eur[g] != null) return { eur: x.eur[g], fonte: "Binance " + s + "/EUR" + nota };
+      if (x.usdt[g] != null) { var cu = cambio("USD", g); if (cu) return { eur: x.usdt[g] * cu, fonte: "Binance " + s + "/USDT al cambio BCE" + nota }; }
       return null;
     }
     return { prepara: prepara, prezzo: prezzo, cambio: cambio, mancanti: function () { return Object.keys(mancanti); } };
@@ -117,7 +130,7 @@
         }
         if (!fatto) {
           var voci = m.voci.filter(function (v) { return v.lato !== "fee"; });
-          var peso = function (v) { var s = v.simbolo; return D.FIAT.indexOf(s) >= 0 || FIAT_BCE.indexOf(s) >= 0 ? 0 : USD_STABLE.indexOf(s) >= 0 || EUR_STABLE.indexOf(s) >= 0 ? 1 : v.lato === "da" ? 2 : 3; };
+          var peso = function (v) { var s = norm(v.simbolo); return D.FIAT.indexOf(s) >= 0 || FIAT_BCE.indexOf(s) >= 0 ? 0 : USD_STABLE.indexOf(s) >= 0 || EUR_STABLE.indexOf(s) >= 0 ? 1 : v.lato === "da" ? 2 : 3; };
           voci.slice().sort(function (x, y) { return peso(x) - peso(y); }).some(function (v) {
             var p = P.prezzo(v.simbolo, g); if (!p) return false;
             m.valore = abs(v.q) * p.eur; m.fonteValore = "stimato: " + p.fonte; fatto = true; return true;
@@ -143,7 +156,7 @@
         var avvisi = [], saldi = Object.keys(q).sort().filter(function (s) { return q[s] > 0n && D.FIAT.indexOf(s) < 0; }).map(function (s) {
           var p = P.prezzo(s, x[2]), n = D.decNum(q[s]);
           if (!p) avvisi.push(s + ": prezzo al " + x[2].split("-").reverse().join("/") + " non trovato, valore zero da completare");
-          return { attivo: s, simbolo: s, tipo: USD_STABLE.indexOf(s) >= 0 || EUR_STABLE.indexOf(s) >= 0 ? "stablecoin" : "cripto", quantita: n, quantitaTesto: D.decStr(q[s]), costo: null, valore: p ? n * p.eur : 0, descrizione: p ? p.fonte : "prezzo mancante" };
+          return { attivo: s, simbolo: s, tipo: USD_STABLE.indexOf(norm(s)) >= 0 || EUR_STABLE.indexOf(norm(s)) >= 0 ? "stablecoin" : "cripto", quantita: n, quantitaTesto: D.decStr(q[s]), costo: null, valore: p ? n * p.eur : 0, descrizione: p ? p.fonte : "prezzo mancante" };
         });
         var negativi = Object.keys(q).filter(function (s) { return q[s] < 0n && D.FIAT.indexOf(s) < 0; });
         if (negativi.length) avvisi.push("Saldi negativi (mancano movimenti in entrata): " + negativi.join(", ") + ".");

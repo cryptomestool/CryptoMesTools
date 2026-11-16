@@ -1,4 +1,4 @@
-/* Koinly Tools: aggiunte allo stile comune (app.css) */
+/* CryptoMesTools: aggiunte allo stile comune (app.css) */
 .beta{display:inline-block;vertical-align:middle;font:700 .62rem var(--f-body);letter-spacing:.1em;text-transform:uppercase;background:#f7931a;color:#1a1405;border-radius:99px;padding:3px 9px;margin-left:6px}
 .beta-avviso{border-color:#f7931a;background:var(--mid-bg)}
 .beta-avviso strong{color:var(--mid)}

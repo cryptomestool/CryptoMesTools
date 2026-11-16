@@ -1,5 +1,5 @@
-/* Koinly Tools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
-/* Koinly Tools · lettura dalla blockchain dei wallet Bitcoin del cliente (senza Koinly).
+/* CryptoMesTools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
+/* CryptoMesTools · lettura dalla blockchain dei wallet Bitcoin del cliente (senza Koinly).
    - Dalle chiavi pubbliche estese (xpub, ypub, zpub; Taproot con xpub BIP86) si ricavano gli indirizzi nel browser:
      la chiave non lascia mai il computer; al servizio esterno arrivano solo i singoli indirizzi.
    - Ogni indirizzo si interroga su mempool.space (gratuito, senza chiave): ricezione (catena 0) e resto (catena 1),
@@ -261,10 +261,19 @@
     ethereum: { nome: "Ethereum", api: "https://eth.blockscout.com/api", nativa: "ETH" },
     base: { nome: "Base", api: "https://base.blockscout.com/api", nativa: "ETH" },
     polygon: { nome: "Polygon", api: "https://polygon.blockscout.com/api", nativa: "POL" },
-    arbitrum: { nome: "Arbitrum", api: "https://arbitrum.blockscout.com/api", nativa: "ETH" },
-    optimism: { nome: "Optimism", api: "https://optimism.blockscout.com/api", nativa: "ETH" },
-    gnosis: { nome: "Gnosis", api: "https://gnosis.blockscout.com/api", nativa: "XDAI" }
+    arbitrum: { nome: "Arbitrum One", api: "https://arbitrum.blockscout.com/api", nativa: "ETH" },
+    optimism: { nome: "Optimism", api: "https://explorer.optimism.io/api", nativa: "ETH" },
+    zksync: { nome: "zkSync Era", api: "https://zksync.blockscout.com/api", nativa: "ETH" },
+    avalanche: { nome: "Avalanche C-Chain", api: "https://api.routescan.io/v2/network/mainnet/evm/43114/etherscan/api", nativa: "AVAX" }
   };
+  /* che cosa è il testo inserito: chiave estesa o indirizzo Bitcoin, indirizzo EVM (0x…), altro */
+  function riconosciChiave(t) {
+    t = String(t || "").trim();
+    if (/^[xyzXYZt]pub[1-9A-HJ-NP-Za-km-z]{100,}$/.test(t)) return "bitcoin-chiave";
+    if (/^(bc1[02-9ac-hj-np-z]{25,90}|[13][1-9A-HJ-NP-Za-km-z]{25,34})$/.test(t)) return "bitcoin-indirizzo";
+    if (/^0x[0-9a-fA-F]{40}$/.test(t)) return "evm";
+    return "";
+  }
   /* token spam: simboli con indirizzi web, inviti a «riscattare», caratteri che imitano token noti */
   function tokenSpam(sim, nome) {
     var s = String(sim || "") + " " + String(nome || "");
@@ -279,7 +288,17 @@
     var tutte = async function (azione) {
       var out = [], pag = 1, dim = 1000;
       while (true) {
-        var r = await get(R.api + "?module=account&action=" + azione + "&address=" + mio + "&page=" + pag + "&offset=" + dim + "&sort=asc");
+        var url = R.api + "?module=account&action=" + azione + "&address=" + mio + "&page=" + pag + "&offset=" + dim + "&sort=asc", r;
+        // limite di richieste segnalato nel testo della risposta: attese crescenti e nuovo tentativo (la risposta non va in cache)
+        for (var k = 0; k < 6; k++) {
+          r = await get(url);
+          if (Array.isArray(r.result) || !/too many|rate limit/i.test(String(r.result || "") + " " + String(r.message || ""))) break;
+          delete cache[url];
+          if (opz.avviso) opz.avviso("il servizio chiede di rallentare, attesa di " + (k + 1) * 10 + " secondi");
+          await new Promise(function (ok) { setTimeout(ok, (opz.attesa || 10000) * (k + 1)); });
+        }
+        // risposta senza elenco: «nessuna transazione» è normale, altrimenti è un errore del servizio (limite, indirizzo non valido)
+        if (!Array.isArray(r.result) && !/^No /i.test(String(r.message || ""))) throw new Error(R.nome + ": " + String(r.result || r.message || "risposta non valida"));
         var l = Array.isArray(r.result) ? r.result : [];
         l.forEach(function (x) { out.push(x); });
         if (opz.avanzamento) opz.avanzamento(azione, pag, out.length);
@@ -415,6 +434,6 @@
     return { chiavi: out, scartate: doppie };
   }
 
-  return { leggiChiave: leggiChiave, chiaviUniche: chiaviUniche, creaRichiesta: creaRichiesta, leggiIndirizzi: leggiIndirizzi, leggiEvm: leggiEvm, movimentiEvm: movimentiEvm, tokenSpam: tokenSpam, RETI: RETI, deriva: deriva, tipoIndirizzo: tipoIndirizzo, indirizzo: indirizzo, leggiWallet: leggiWallet, movimenti: movimenti, leggiElencoChiavi: leggiElencoChiavi,
+  return { riconosciChiave: riconosciChiave, leggiChiave: leggiChiave, chiaviUniche: chiaviUniche, creaRichiesta: creaRichiesta, leggiIndirizzi: leggiIndirizzi, leggiEvm: leggiEvm, movimentiEvm: movimentiEvm, tokenSpam: tokenSpam, RETI: RETI, deriva: deriva, tipoIndirizzo: tipoIndirizzo, indirizzo: indirizzo, leggiWallet: leggiWallet, movimenti: movimenti, leggiElencoChiavi: leggiElencoChiavi,
     sha256: sha256, sha512: sha512, ripemd160: ripemd160, hex: hex, utf8: utf8, API: API };
 });

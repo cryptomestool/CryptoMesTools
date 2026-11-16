@@ -72,5 +72,22 @@ const mov = [
     assert.ok(fin.r.saldi.every((x) => x.simbolo !== "USD"));
     assert.ok(fin.r.avvisi.some((a) => /XYZ: prezzo/.test(a)));
   });
+  // sinonimi e nome precedente: WETH vale ETH; POL prima del 2024 usa la serie MATIC
+  const json2 = (url) => {
+    if (url.indexOf("frankfurter") >= 0) return Promise.resolve({ rates: { "2023-06-01": { USD: 1.25 }, "2024-10-01": { USD: 1.25 } } });
+    const sym = /symbol=([A-Z]+)/.exec(url)[1];
+    const serie = { ETHEUR: [k("2023-06-01", 1700)], POLUSDT: [k("2024-10-01", 0.4)], MATICUSDT: [k("2023-06-01", 0.9)] };
+    if (!serie[sym]) return Promise.resolve(null);
+    const st = +/startTime=(\d+)/.exec(url)[1], en = +/endTime=(\d+)/.exec(url)[1];
+    return Promise.resolve(serie[sym].filter((x) => x[0] >= st && x[0] <= en));
+  };
+  const P2 = Z.crea({ json: json2 });
+  await P2.prepara([{ simbolo: "WETH", giorno: "2023-06-01" }, { simbolo: "POL", giorno: "2023-06-01" }, { simbolo: "POL", giorno: "2024-10-01" }, { simbolo: "USDC.e", giorno: "2023-06-01" }]);
+  t("sinonimi (WETH come ETH, USDC.e come USDC) e POL con la serie MATIC prima del cambio di nome", () => {
+    assert.deepEqual(P2.prezzo("WETH", "2023-06-01"), { eur: 1700, fonte: "Binance ETH/EUR (come ETH)" });
+    assert.equal(P2.prezzo("USDC.e", "2023-06-01").eur, 0.8);
+    assert.equal(P2.prezzo("POL", "2023-06-01").eur, 0.9 * 0.8);
+    assert.equal(P2.prezzo("POL", "2024-10-01").eur, 0.4 * 0.8);
+  });
   console.log(n + " prove superate");
 })().catch((e) => { console.log("ERRORE", e && e.stack || e); });

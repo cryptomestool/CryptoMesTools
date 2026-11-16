@@ -1,5 +1,5 @@
-/* Koinly Tools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
-/* Koinly Tools · scrittura di un documento Word (.docx) senza librerie esterne, nello stile delle memorie dello studio:
+/* CryptoMesTools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
+/* CryptoMesTools · scrittura di un documento Word (.docx) senza librerie esterne, nello stile delle memorie dello studio:
    A4 verticale, Arial 12, interlinea 1,5, testo giustificato, titoli centrati in grassetto, intestazione e piè di pagina
    con i dati dello studio e «Pag. x di y». Usa lo zip di xlsx-mini.js.
    blocchi: [{ t: "p", testo, allinea: "left|center|right|both", b, spazioDopo },

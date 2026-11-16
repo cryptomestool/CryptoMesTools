@@ -1,10 +1,12 @@
-# Koinly Tools
+# CryptoMesTools
 
 Programma a codice aperto (open source), mantenuto con le donazioni in bitcoin su Lightning Network. Indirizzo per le donazioni e link al codice in `studio.js`.
 
-> Koinly Tools non è affiliato né approvato da Koinly. «Koinly» è un marchio dei rispettivi titolari, citato solo per indicare i report compatibili.
+> CryptoMesTools non è affiliato né approvato da Koinly. «Koinly» è un marchio dei rispettivi titolari, citato solo per indicare i report compatibili.
 
 Web app statica per le cripto-attività a partire dai report Koinly. All'apertura si sceglie il percorso (la dichiarazione, rispondere all'Agenzia delle Entrate, entrambe, creare il fascicolo per i controlli): il programma mostra solo le schede e i file che servono e l'elenco dei documenti da produrre, con lo stato di ciascuno. Nel percorso «fascicolo» le risposte alle domande tipo, la dichiarazione sostitutiva, la provenienza dei fondi e la memoria si preparano in anticipo, prima di qualunque richiesta. Tutto gira nel browser: i file caricati non vengono salvati né inviati in rete. È pensata per essere incorporata (iframe) nella pagina del sito dello studio; `_headers` consente l'incorporamento da studiomecommercialisti.it.
+
+Schede: **Guida** · **Caricamento file** (con «Verifiche e riconciliazione»: operazioni da correggere, richiesta di chiarimenti al cliente, estratti conto) · **Quadri RW, RT, F24 e sanzioni** · **Fascicolo fiscale** · **Fascicolo risposta Agenzia delle Entrate** (questionario e pratica). Costi di carico e giorni di detenzione non hanno una scheda propria: lavorano sotto i quadri e si consultano nel «Dettaglio dei calcoli» in fondo alla scheda dei quadri. Le sezioni che seguono descrivono i criteri di calcolo.
 
 ## 1. Giorni di detenzione e IVACA
 

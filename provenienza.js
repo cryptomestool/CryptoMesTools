@@ -1,5 +1,5 @@
-/* Koinly Tools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
-/* Koinly Tools · verifica della provenienza dei fondi investiti in cripto-attività, per il fascicolo di risposta all'Agenzia.
+/* CryptoMesTools · Copyright (C) 2026 Massimo Esposito · licenza GNU AGPL-3.0 (file LICENSE) */
+/* CryptoMesTools · verifica della provenienza dei fondi investiti in cripto-attività, per il fascicolo di risposta all'Agenzia.
    Per ogni anno, in modo cumulato dal primo anno:
    - impiego: denaro entrato nelle piattaforme di cripto-attività (versamenti in valuta o acquisti pagati direttamente in valuta),
      meno quello tornato al cliente (prelievi in valuta o vendite accreditate direttamente);
