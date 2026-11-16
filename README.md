@@ -68,7 +68,7 @@ Nel riquadro «Senza Koinly» della scheda di caricamento le transazioni si rico
   - operazione senza controvalore: valore inserito a mano.
 - **Salvataggio:** correzioni e attribuzioni si salvano e si ricaricano in un file JSON.
 - **Uscite:** riscontro con i costi dei report Koinly; Excel (costi, strati, cessioni, correzioni) e PDF. Il quadro RT usa questi costi come fonte predefinita.
-- **Estratti conto bancari in PDF, anonimizzati alla lettura** (`banca.js`):
+- **Conti correnti: estratti conto in PDF o movimenti in CSV ed Excel (.xlsx), anonimizzati alla lettura** (`banca.js`, riquadro in «Lavoro dello studio»):
   - si tengono solo data, importo, segno ed exchange dei movimenti con piattaforme di cripto-attività;
   - tutte le altre righe sono scartate e se ne conta solo il numero;
   - nomi, IBAN, indirizzi e causali non vengono mai conservati né mostrati;
@@ -176,7 +176,7 @@ Scheda «Guida» per il cliente (`guida.js`): quali file Koinly scaricare, come 
 | `lettura.js` | Lettura dei report di saldi Koinly (CSV e PDF, italiano e inglese) |
 | `detenzione.js` | Transazioni, giorni di detenzione, periodi, token sospetti, riscontri |
 | `ivaca.js` | Valori dei periodi e imposta |
-| `banca.js` | Lettura anonimizzata degli estratti conto e riscontro con Koinly |
+| `banca.js` | Lettura anonimizzata degli estratti conto (PDF, CSV, Excel) e riscontro con Koinly |
 | `etoro.js` | Lettura del rendiconto eToro in PDF e passaggio dei dati alla forma comune dei broker esteri |
 | `estero.js` | Motore comune dei broker esteri (quadri RT al 26%, RM e RW con IVAFE e IVACA) e lettura del modello CSV generico |
 | `report.js` | Lettura degli altri report Koinly (Income, Expenses, Gifts/Lost, Other gains) |
