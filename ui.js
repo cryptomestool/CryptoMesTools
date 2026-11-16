@@ -2,7 +2,7 @@
 /* CryptoMesTools · interfaccia. I file caricati restano nel browser: non vengono salvati né inviati in rete. */
 (function () {
   "use strict";
-  var L = window.KoinlyLettura, D = window.KoinlyDetenzione, I = window.KoinlyIvaca, Z = window.KoinlySanzioni, MOD = window.KoinlyModelli, C = window.KoinlyCosti, QZ = window.KoinlyQuestionario, BK = window.KoinlyBanca, ET = window.KoinlyEtoro, KX = window.KoinlyEstero, PV = window.KoinlyProvenienza, PR = window.KoinlyPratica, KR = window.KoinlyReport, PT = window.KoinlyPiattaforme, OC = window.KoinlyOnchain, PZ = window.KoinlyPrezzi;
+  var L = window.KoinlyLettura, D = window.KoinlyDetenzione, I = window.KoinlyIvaca, Z = window.KoinlySanzioni, MOD = window.KoinlyModelli, C = window.KoinlyCosti, QZ = window.KoinlyQuestionario, BK = window.KoinlyBanca, ET = window.KoinlyEtoro, KX = window.KoinlyEstero, PV = window.KoinlyProvenienza, PR = window.KoinlyPratica, KR = window.KoinlyReport, PT = window.KoinlyPiattaforme, OC = window.KoinlyOnchain, PZ = window.KoinlyPrezzi, KK = window.KoinlyKraken;
   if (window.pdfjsLib) window.pdfjsLib.GlobalWorkerOptions.workerSrc = "comune/vendor/pdf.worker.min.js";
   var app = document.getElementById("app");
 
@@ -323,8 +323,12 @@
       (esiti ? '<ul class="small" style="margin:6px 0 0;padding-left:18px">' + esiti + "</ul>" : "") +
       (K.avvisi.length ? '<p class="small" style="color:var(--mid)">' + K.avvisi.map(esc).join("<br>") + "</p>" : "");
     return '<div class="panel" style="margin-top:14px"><h3 style="margin-top:0">B. Senza Koinly: piattaforme e analisi on-chain</h3><p class="small">In alternativa alla strada A (Koinly). Le transazioni si ricostruiscono dai CSV esportati dalle piattaforme e, per i wallet, dalla blockchain (analisi on-chain). I trasferimenti tra wallet e piattaforme del cliente si abbinano da soli, per hash o per importo: così i dati si riconciliano. I prezzi in euro mancanti sono quelli di chiusura del giorno su Binance, in euro o in USDT al cambio BCE. I saldi al 1/1 e al 31/12 si ricostruiscono dalle transazioni. Tutti questi valori sono stimati: verificateli e correggeteli in «Verifiche e riconciliazione», qui sotto. Se caricate i report dei saldi Koinly, valgono quelli.</p>' +
-      '<div class="slots">' + riquadro("File delle piattaforme", "Piattaforme", "CSV di Binance (Transaction History, con la Deposit e Withdraw History e il report fiscale), Coinbase e Coinbase Pro, Nexo, Young Platform, Revolut (sezione Cripto e Revolut X), Relai, Ledger Live, BitBoxApp ed Etherscan. Anche più file e più anni insieme: le righe ripetute contano una volta. Un CSV con l'elenco delle chiavi pubbliche («Portafoglio; Tipo; Chiave pubblica estesa») aggiunge i wallet qui sotto.",
+      '<div class="slots">' + riquadro("File delle piattaforme", "Piattaforme", "CSV di Binance (Transaction History, con la Deposit e Withdraw History e il report fiscale), Coinbase e Coinbase Pro, Nexo, Young Platform, Revolut (sezione Cripto e Revolut X), Kraken (Ledgers), Relai, Ledger Live, BitBoxApp ed Etherscan. Anche più file e più anni insieme: le righe ripetute contano una volta. Un CSV con l'elenco delle chiavi pubbliche («Portafoglio; Tipo; Chiave pubblica estesa») aggiunge i wallet qui sotto.",
         '<input type="file" multiple accept=".csv,text/csv" data-piatt>', K.file.length ? '<p class="stato">' + K.file.map(function (f, i) { return "<b>" + esc(f.nome) + '</b> <button type="button" class="btnlink small" data-toglipiatt="' + i + '">togli</button>'; }).join("<br>") + "</p>" : "", false, K.file.length) + "</div>" +
+      '<h3 style="margin:16px 0 4px">Kraken con la chiave API</h3><p class="small" style="margin:0 0 6px">In alternativa al CSV «Ledgers». Il cliente crea su Kraken (Impostazioni → API) una chiave con il solo permesso <b>«Query Ledger Entries»</b> (nessun permesso di prelievo o di trading) e vi dà la chiave API e la chiave privata. La firma delle richieste si calcola in questo browser: la chiave privata non viene inviata né salvata. Le richieste firmate passano dal collegamento del sito (Kraken non accetta chiamate dirette dalle pagine web), che le inoltra senza conservarle. I movimenti scaricati diventano un file «Kraken Ledgers (API)» tra i file delle piattaforme, che si può salvare per il fascicolo. Dopo l\'uso conviene cancellare la chiave su Kraken.</p>' +
+      '<div class="toolbar" style="flex-wrap:wrap;gap:6px"><input type="text" id="krakenChiave" autocomplete="off" spellcheck="false" placeholder="Chiave API (API Key)" style="flex:1;min-width:200px;font-family:var(--mono,monospace);font-size:12px"> <input type="password" id="krakenSegreto" autocomplete="new-password" spellcheck="false" placeholder="Chiave privata (Private Key)" style="flex:1;min-width:200px;font-family:var(--mono,monospace);font-size:12px"> <button type="button" class="btn ghost" id="scaricaKraken"' + (K.lavoro ? " disabled" : "") + '>Scarica i movimenti Kraken</button>' +
+      (K.file.some(function (f) { return f.api === "kraken"; }) ? ' <button type="button" class="btnlink small" id="salvaKraken">salva il CSV scaricato</button>' : "") + "</div>" +
+      (K.kraken ? '<p class="stato"' + (K.kraken.errore ? ' style="color:var(--hi)"' : "") + ">" + esc(K.kraken.testo) + "</p>" : "") +
       '<h3 style="margin:16px 0 4px">Wallet per l\'analisi on-chain</h3><p class="small" style="margin:0 0 6px">Per ogni wallet: nome, blockchain e chiave pubblica o indirizzo. <b>Bitcoin</b>: chiave pubblica estesa (xpub, ypub, zpub; per Taproot scrivete «Taproot» nel nome) oppure uno o più indirizzi. <b>Reti EVM</b> (Ethereum, Base, Polygon, Arbitrum, Optimism, zkSync, Avalanche): l\'indirizzo 0x…, letto sulla rete scelta o su «Tutte le reti EVM». Le chiavi restano in questo browser: ai servizi pubblici (mempool.space, Blockscout, Routescan) arrivano solo gli indirizzi, con una richiesta ogni 1-2 secondi. Le chiavi private e le frasi di recupero non vanno mai inserite.</p>' +
       '<div class="scroll"><table class="det"><thead><tr><th>Wallet</th><th>Blockchain</th><th>Chiave pubblica o indirizzo</th><th>Esito</th><th></th></tr></thead><tbody>' + righe + "</tbody></table></div>" +
       '<div class="toolbar" style="margin-top:8px"><button type="button" class="btn ghost" id="aggiungiWallet">+ Aggiungi wallet</button> <button type="button" class="btn gold" id="analisiOnchain"' + (K.lavoro ? " disabled" : "") + ">" + (K.lavoro ? "Analisi in corso…" : "Analisi on-chain") + "</button>" +
@@ -382,6 +386,28 @@
     }
     K.lavoro = false;
     await ricostruisci();
+  }
+  /* Kraken via API: firma nel browser, scarica i ledger e li aggiunge come file «Kraken Ledgers (API)» */
+  async function scaricaKraken() {
+    var K = S.senza; if (K.lavoro) return;
+    var ch = document.getElementById("krakenChiave"), sg = document.getElementById("krakenSegreto");
+    var chiave = ch ? ch.value.trim() : "", segreto = sg ? sg.value.trim() : "";
+    var err = KK.controllaChiave(chiave, segreto);
+    if (err) { K.kraken = { errore: true, testo: err }; render(); return; }
+    K.lavoro = true; K.kraken = { testo: "Collegamento con Kraken…" }; render();
+    try {
+      var ledger = await KK.scaricaLedger({ chiave: chiave, segreto: segreto, avanzamento: function (t) { K.kraken = { testo: t + "…" }; avanzSenza(t); } });
+      var n = Object.keys(ledger).length, oggi = new Date();
+      if (!n) throw new Error("Kraken non restituisce movimenti per questa chiave: il conto è vuoto o la chiave appartiene a un altro conto.");
+      var nome = "Kraken Ledgers (API) " + oggi.toISOString().slice(0, 10) + ".csv";
+      K.file = K.file.filter(function (f) { return f.api !== "kraken"; });
+      K.file.push({ nome: nome, testo: KK.versoCsv(ledger), api: "kraken" });
+      K.kraken = { testo: n.toLocaleString("it-IT") + " movimenti scaricati da Kraken il " + it(oggi.toISOString().slice(0, 10)) + "." };
+    } catch (e) { K.kraken = { errore: true, testo: e.message || String(e) }; }
+    chiave = segreto = "";
+    K.lavoro = false; K.avanzamento = "";
+    if (!K.kraken.errore) return ricostruisci();
+    render();
   }
   function copiaMov(m) { return Object.assign({}, m, { voci: m.voci.map(function (v) { return Object.assign({}, v); }) }); }
   /* unisce file delle piattaforme e wallet letti, abbina i trasferimenti, completa i prezzi e ricostruisce i saldi */
@@ -2248,6 +2274,8 @@
     else if (t.matches("[data-toglisaldi]")) { var dz = t.getAttribute("data-toglisaldi"); S.saldiFile = S.saldiFile.filter(function (z) { return z.data !== dz; }); scegliAnno(); ricalcola(); render(); }
     else if (t.matches("[data-annoivaca]")) { S.anno = +t.getAttribute("data-annoivaca"); S.inclusi = {}; S.valori = {}; ricalcola(); render(); }
     else if (t.id === "leggiSenza") ricostruisci();
+    else if (t.id === "scaricaKraken") scaricaKraken();
+    else if (t.id === "salvaKraken") { var fk = S.senza.file.filter(function (f) { return f.api === "kraken"; })[0]; if (fk) scaricaFile(fk.nome, new Blob([fk.testo], { type: "text/csv" })); }
     else if (t.id === "analisiOnchain") analisiOnchain(false);
     else if (t.id === "aggiungiWallet") { nuovoWallet(); render(); }
     else if (t.id === "apriFlash") mostraFlash();

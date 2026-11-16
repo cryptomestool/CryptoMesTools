@@ -8,7 +8,7 @@
    nella valuta del file (USD per Coinbase e Nexo) oppure assente, da completare con i prezzi di mercato.
    Piattaforme: Binance (Transaction History, con Deposit e Withdraw History per indirizzi e hash e il report fiscale per i
    valori in euro), Coinbase (report delle transazioni) e Coinbase Pro (estratto conto «account»), Nexo, Young Platform, Revolut (sezione Cripto e
-   Revolut X), Relai, Ledger Live, BitBoxApp, Etherscan; l'estratto conto in euro di Revolut è riconosciuto ma non contiene le cripto. */
+   Revolut X), Kraken (Ledgers, da CSV o da API), Relai, Ledger Live, BitBoxApp, Etherscan; l'estratto conto in euro di Revolut è riconosciuto ma non contiene le cripto. */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory(require("./detenzione.js"));
   else root.KoinlyPiattaforme = factory(root.KoinlyDetenzione);
@@ -492,9 +492,79 @@
     return { piattaforma: piattaforma, formato: piattaforma, numeri: "en", fuso: "UTC", movimenti: mov, righe: righe, cancellate: 0, senzaData: 0, senzaImporti: 0, avvisi: avvisi, senzaControvalore: senza };
   }
 
+  /* ---------- Kraken (ledgers: CSV «Ledgers» dell'esportazione o API privata Ledgers, stesse colonne) ----------
+     Ogni riga è una variazione di saldo; le righe con lo stesso refid sono una sola operazione (le due gambe di uno scambio).
+     amount con segno, fee a parte (positiva, sempre addebitata sull'asset della riga). Gli asset hanno i nomi storici di Kraken
+     (XXBT, XETH, ZEUR…) e i suffissi dei conti interni (.S staking, .M opt-in rewards, .F earn flessibile, .B bonded, .HOLD). */
+  var KRAKEN_NOMI = { XBT: "BTC", XXBT: "BTC", XDG: "DOGE", XXDG: "DOGE", XETH: "ETH", ETH2: "ETH", XLTC: "LTC", XXRP: "XRP", XXLM: "XLM", XETC: "ETC", XMLN: "MLN", XREP: "REP", XZEC: "ZEC", XXMR: "XMR", XICN: "ICN", XNMC: "NMC", XXVN: "XVN", ZEUR: "EUR", ZUSD: "USD", ZGBP: "GBP", ZCAD: "CAD", ZJPY: "JPY", ZAUD: "AUD", ZCHF: "CHF" };
+  function krakenSim(a) { var s = String(a || "").trim().toUpperCase().replace(/\.(S|M|F|P|B|HOLD|EQ)$/, ""); return KRAKEN_NOMI[s] || s; }
+  var KRAKEN_INTERNI = /^(spottostaking|stakingfromspot|stakingtospot|spotfromstaking|spottofutures|spotfromfutures|allocation|deallocation|autoallocation|migration)$/i;
+  function leggiKraken(testo) {
+    var r = Array.isArray(testo) ? testo : tabella(testo, ["refid", "time", "type", "asset", "amount", "fee"]);
+    if (!r) return { errore: "File Kraken senza le colonne refid, time, type, asset, amount, fee (serve l'esportazione «Ledgers»)." };
+    var mov = [], avvisi = [], W = "Kraken", interni = 0, margine = 0, gruppi = {}, ordine = [], sconosciuti = {};
+    r.forEach(function (x) {
+      x.ts = data(x.time); x.sim = krakenSim(x.asset); x.qq = q(x.amount); x.ff = q(x.fee);
+      x.tipo = String(x.type || "").toLowerCase(); x.sub = String(x.subtype || "").toLowerCase();
+    });
+    r = r.filter(function (x) { return x.ts != null && (x.qq !== 0n || x.ff !== 0n); }).sort(function (a, b) { return a.ts - b.ts || a._riga - b._riga; });
+    var cv = function (voci) { var f = voci.filter(function (v) { return v[0] !== "EUR" && FIAT.indexOf(v[0]) >= 0; })[0]; return f ? { importo: D.decNum(abs(f[1])), valuta: f[0] } : null; };
+    var commissione = function (x, descr) { if (x.ff <= 0n) return; var t = movimento({ riga: x._riga, ts: x.ts, tipo: "withdrawal", tag: "cost", wallet: W, da: [x.sim, x.ff], descrizione: descr }); if (t) mov.push(t); };
+    r.forEach(function (x) {
+      var base = { riga: x._riga, ts: x.ts, wallet: W, descrizione: "Kraken " + x.tipo + (x.sub ? " (" + x.sub + ")" : "") }, m = null;
+      if (/^(trade|spend|receive|adjustment)$/.test(x.tipo) && x.refid) {
+        var k = x.refid; if (!gruppi[k]) { gruppi[k] = []; ordine.push(k); } gruppi[k].push(x); return;
+      }
+      if (/^(margin|rollover|settled)$/.test(x.tipo)) { margine++; return; }
+      if ((x.tipo === "transfer" || x.tipo === "earn") && KRAKEN_INTERNI.test(x.sub)) { interni++; commissione(x, "Commissione Kraken su movimento interno"); return; }
+      if (x.tipo === "deposit" && x.qq > 0n) m = Object.assign(base, { tipo: "deposit", a: [x.sim, x.qq], fee: x.ff > 0n ? [x.sim, x.ff] : null });
+      else if (x.tipo === "withdrawal" && x.qq < 0n) m = Object.assign(base, { tipo: "withdrawal", da: [x.sim, x.qq], fee: x.ff > 0n ? [x.sim, x.ff] : null });
+      else if ((x.tipo === "staking" || x.tipo === "dividend" || (x.tipo === "earn" && /^(reward|)$/.test(x.sub))) && x.qq > 0n) m = Object.assign(base, { tipo: "deposit", tag: "reward", a: [x.sim, x.qq], descrizione: "Ricompensa Kraken (" + x.tipo + ")" });
+      else if (x.tipo === "transfer" && x.qq > 0n) { m = Object.assign(base, { tipo: "deposit", tag: "airdrop", a: [x.sim, x.qq], descrizione: "Accredito Kraken (airdrop o fork)" }); avvisi.push("Riga " + x._riga + ": accredito «transfer» di " + D.decStr(x.qq) + " " + x.sim + " letto come airdrop o fork: verificare."); }
+      else if (x.tipo === "credit" && x.qq > 0n) { m = Object.assign(base, { tipo: "deposit", tag: "cashback", a: [x.sim, x.qq], descrizione: "Accredito promozionale Kraken" }); }
+      else {
+        m = Object.assign(base, { tipo: x.qq > 0n ? "deposit" : "withdrawal", a: x.qq > 0n ? [x.sim, x.qq] : null, da: x.qq < 0n ? [x.sim, x.qq] : null, fee: x.ff > 0n ? [x.sim, x.ff] : null });
+        var sk = x.tipo + (x.sub ? "/" + x.sub : ""); sconosciuti[sk] = (sconosciuti[sk] || 0) + 1;
+      }
+      var t = movimento(m); if (t) mov.push(t);
+    });
+    // scambi (trade), acquisti rapidi (spend/receive) e conversioni (adjustment): le gambe con lo stesso refid
+    ordine.forEach(function (k) {
+      var g = gruppi[k], net = {}, fee = {}, sims = [];
+      g.forEach(function (x) { if (!(x.sim in net)) { net[x.sim] = 0n; sims.push(x.sim); } net[x.sim] += x.qq; if (x.ff > 0n) fee[x.sim] = (fee[x.sim] || 0n) + x.ff; });
+      var usc = sims.filter(function (s) { return net[s] < 0n; }), ent = sims.filter(function (s) { return net[s] > 0n; });
+      var tipoG = g[0].tipo, descr = tipoG === "trade" ? "Scambio Kraken" : tipoG === "adjustment" ? "Conversione Kraken (adjustment)" : "Acquisto rapido Kraken";
+      var fk = Object.keys(fee), fp = fk.filter(function (s) { return usc.indexOf(s) >= 0 || ent.indexOf(s) >= 0; })[0] || fk[0];
+      if (usc.length === 1 && ent.length === 1) {
+        var t = movimento({ riga: g[0]._riga, ts: g[g.length - 1].ts, tipo: "trade", wallet: W, da: [usc[0], net[usc[0]]], a: [ent[0], net[ent[0]]], fee: fp ? [fp, fee[fp]] : null, descrizione: descr, controvalore: cv([[usc[0], net[usc[0]]], [ent[0], net[ent[0]]]]) });
+        if (t) mov.push(t);
+      } else {
+        if (usc.length + ent.length > 0) avvisi.push("Riga " + g[0]._riga + ": operazione Kraken " + k + " (" + tipoG + ") con " + (usc.length ? usc.length + " uscite" : "nessuna uscita") + " e " + (ent.length ? ent.length + " entrate" : "nessuna entrata") + ": lette come movimenti separati, da verificare.");
+        var restanti = Object.assign({}, fee);
+        sims.forEach(function (s) {
+          if (net[s] === 0n) return;
+          var f = restanti[s]; delete restanti[s];
+          var tt = movimento({ riga: g[0]._riga, ts: g[0].ts, tipo: net[s] > 0n ? "deposit" : "withdrawal", wallet: W, a: net[s] > 0n ? [s, net[s]] : null, da: net[s] < 0n ? [s, net[s]] : null, fee: f ? [s, f] : null, descrizione: descr + " (gamba isolata)" });
+          if (tt) mov.push(tt);
+        });
+        Object.keys(restanti).forEach(function (s) { var tc = movimento({ riga: g[0]._riga, ts: g[0].ts, tipo: "withdrawal", tag: "cost", wallet: W, da: [s, restanti[s]], descrizione: "Commissione " + descr.toLowerCase() }); if (tc) mov.push(tc); });
+        return;
+      }
+      fk.filter(function (s) { return s !== fp; }).forEach(function (s) { var tc = movimento({ riga: g[0]._riga, ts: g[0].ts, tipo: "withdrawal", tag: "cost", wallet: W, da: [s, fee[s]], descrizione: "Commissione " + descr.toLowerCase() }); if (tc) mov.push(tc); });
+    });
+    mov.sort(function (a, b) { return a.ts - b.ts || a.riga - b.riga; });
+    if (margine) avvisi.push(margine + " righe di trading a margine (margin, rollover, settled) non lette: sono strumenti derivati, da trattare a parte.");
+    Object.keys(sconosciuti).forEach(function (s) { avvisi.push("Operazioni Kraken «" + s + "» non riconosciute (" + sconosciuti[s] + "): lette come entrate o uscite, da verificare."); });
+    var res = risultato("Kraken", mov, avvisi, r.length);
+    res.interni = interni;
+    return res;
+  }
+
   /* ---------- riconoscimento ---------- */
   function riconosci(testo, nome) {
     if (haColonne(testo, ["Operation", "Coin", "Change"])) return "binance";
+    if (haColonne(testo, ["refid", "time", "type", "asset", "amount", "fee"])) return "kraken";
+    if (haColonne(testo, ["txid", "ordertxid", "pair", "time", "type", "vol"])) return "kraken-scambi";
     if (haColonne(testo, ["datetime_tz_CET", "sent_amount", "received_amount", "sent_value_EUR"])) return "binance-fiscale";
     if (haColonne(testo, ["portfolio", "type", "time", "amount", "amount/balance unit"])) return "coinbase-pro";
     if (haColonne(testo, ["portfolio", "trade id", "product", "side", "created at", "size"])) return "coinbase-pro-fills";
@@ -688,6 +758,7 @@
       if (p.tipo === "bitbox" || p.tipo === "etherscan") { var rw = p.tipo === "bitbox" ? leggiBitBox(p.f.testo, p.f.nome) : leggiEtherscan(p.f.testo, p.f.nome); rw.nome = p.f.nome; esiti.push(rw); return; }
       if (p.tipo === "chiavi" || p.tipo === "indirizzi") { esiti.push({ nome: p.f.nome, piattaforma: p.tipo === "chiavi" ? "Chiavi pubbliche" : "Indirizzi dei wallet", ausiliario: true, movimenti: [], avvisi: ["Elenco di " + (p.tipo === "chiavi" ? "chiavi pubbliche" : "indirizzi") + ": servirà per la lettura dalla blockchain e per attribuire i wallet al cliente."] }); return; }
       if (p.tipo === "koinly") { esiti.push({ nome: p.f.nome, errore: "File di Koinly: in questa modalità si caricano i file delle piattaforme. I file Koinly si usano nella modalità «file Koinly»." }); return; }
+      if (p.tipo === "kraken-scambi") { esiti.push({ nome: p.f.nome, errore: "È l'elenco «Trades» di Kraken: contiene solo gli scambi. Serve l'esportazione «Ledgers», che ha anche depositi, prelievi, staking e commissioni (oppure il collegamento con la chiave API)." }); return; }
       if (!LETTORI[p.tipo]) {
         esiti.push({ nome: p.f.nome, errore: p.tipo === "revolut-conto" ? "È l'estratto del conto in euro di Revolut: le cripto non ci sono (gli acquisti risultano solo come «Transfer to Revolut Digital Assets»). Serve l'estratto della sezione Cripto o di Revolut X." : "Formato non riconosciuto." });
         return;
@@ -824,6 +895,7 @@
     "young": { leggi: function (t) { return leggiYoung(t); }, colonne: ["credit", "debit", "currency", "date", "tx_type"], chiave: function (x) { return x.id ? "id=" + x.id : tutte(x); } },
     "revolut": { leggi: function (t) { return leggiRevolut(t); }, colonne: ["Symbol", "Type", "Quantity", "Price", "Value", "Fees", "Date"], chiave: tutte },
     "relai": { leggi: function (t) { return leggiRelai(t); }, colonne: ["Date", "Transaction Type", "BTC Amount", "Fiat Amount (excl. fees)", "Destination"], chiave: function (x) { return x["Operation ID"] ? "id=" + x["Operation ID"] : tutte(x); } },
+    "kraken": { leggi: function (t) { return leggiKraken(t); }, colonne: ["refid", "time", "type", "asset", "amount", "fee"], chiave: function (x) { return x.txid ? "id=" + x.txid : tutte(x); } },
     "ledger": { leggi: function (t) { return leggiLedger(t); }, colonne: ["Operation Date", "Currency Ticker", "Operation Type", "Operation Amount"], chiave: function (x) { return [x["Operation Date"], x["Currency Ticker"], x["Operation Type"], x["Operation Amount"], x["Operation Hash"], x["Account Name"]].join("|"); } }
   };
   /* unione di più file: una riga compare tante volte quante nel file che ne ha di più (righe uguali nello stesso file restano) */
@@ -859,5 +931,5 @@
     if (rk.length) cb[0].avvisi.push("Passaggi tra Coinbase e Coinbase Pro senza la voce corrispondente nell'estratto Pro: " + rk.map(function (k) { return D.decStr(resto[k], 8) + " " + k; }).join(", ") + ".");
   }
 
-  return { riconosci: riconosci, leggiFile: leggiFile, abbinaTrasferimenti: abbinaTrasferimenti, togliDoppioni: togliDoppioni, leggiScambiApp: leggiScambiApp, applicaScambi: applicaScambi, leggiRevolut: leggiRevolut, leggiRelai: leggiRelai, leggiBitBox: leggiBitBox, leggiEtherscan: leggiEtherscan, dataRevolut: dataRevolut, leggiCoinbasePro: leggiCoinbasePro, romaUTC: romaUTC, leggiBinance: leggiBinance, leggiCoinbase: leggiCoinbase, leggiNexo: leggiNexo, leggiYoung: leggiYoung, leggiLedger: leggiLedger, scartoDaNome: scartoDaNome, righeCsv: righeCsv };
+  return { riconosci: riconosci, leggiFile: leggiFile, abbinaTrasferimenti: abbinaTrasferimenti, togliDoppioni: togliDoppioni, leggiScambiApp: leggiScambiApp, applicaScambi: applicaScambi, leggiRevolut: leggiRevolut, leggiRelai: leggiRelai, leggiBitBox: leggiBitBox, leggiEtherscan: leggiEtherscan, dataRevolut: dataRevolut, leggiCoinbasePro: leggiCoinbasePro, romaUTC: romaUTC, leggiBinance: leggiBinance, leggiCoinbase: leggiCoinbase, leggiNexo: leggiNexo, leggiYoung: leggiYoung, leggiLedger: leggiLedger, leggiKraken: leggiKraken, krakenSim: krakenSim, scartoDaNome: scartoDaNome, righeCsv: righeCsv };
 });
