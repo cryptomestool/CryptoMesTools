@@ -31,7 +31,7 @@
   /* proxy: sul sito pubblicato è lo stesso indirizzo; in anteprima locale si usa quello pubblicato */
   function proxyPredefinito() {
     var h = typeof location !== "undefined" ? location.hostname : "";
-    return /^(localhost|127\.0\.0\.1)$/.test(h) || !h ? "https://koinly-tools.netlify.app/api/kraken" : "/api/kraken";
+    return /^(localhost|127\.0\.0\.1)$/.test(h) || !h ? "https://cryptomestools.netlify.app/api/kraken" : "/api/kraken";
   }
   function controllaChiave(chiave, segreto) {
     if (!String(chiave || "").trim() || !String(segreto || "").trim()) return "Inserite la chiave API (API Key) e la chiave privata (Private Key) generate su Kraken.";

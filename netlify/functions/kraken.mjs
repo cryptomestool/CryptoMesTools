@@ -3,7 +3,7 @@
    Riceve una richiesta già firmata nel browser (la chiave privata non arriva qui), la inoltra a api.kraken.com e restituisce
    la risposta. Non salva e non registra nulla. Solo l'endpoint di lettura Ledgers e solo dalle pagine di CryptoMesTools. */
 const PERCORSI = ["/0/private/Ledgers"];
-const ORIGINI = ["https://koinly-tools.netlify.app", "http://localhost:8765", "http://127.0.0.1:8765"];
+const ORIGINI = ["https://cryptomestools.netlify.app", "https://koinly-tools.netlify.app", "http://localhost:8765", "http://127.0.0.1:8765"];
 
 export default async (req) => {
   const origine = req.headers.get("origin") || "";
