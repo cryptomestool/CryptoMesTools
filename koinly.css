@@ -124,3 +124,15 @@ table.periodi{font-size:.8rem;margin:6px 0 4px}
 }
 .calcolo-sanz{margin-top:3px;padding:3px 6px;background:var(--info-bg);border-left:3px solid var(--navy);font-size:.82rem}
 @media print{#resoconto .calcolo-sanz{background:#eef1f6;border-left:3px solid #1d2a4a;font-size:7pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+/* ricomincia da capo (intestazione) e riepilogo dopo la ricostruzione */
+header.band .wrap{position:relative}
+.ricomincia{position:absolute;top:14px;right:16px;font:600 .82rem var(--f-body);padding:6px 10px;border-radius:6px;cursor:pointer;background:transparent;color:var(--onnavy-2,#fff);border:1px solid currentColor}
+.ricomincia:hover{color:var(--gold)}
+header.band .brand{padding-right:180px}
+@media (max-width:640px){.ricomincia{position:static;margin:6px 0}header.band .brand{padding-right:0}}
+@media print{.ricomincia{display:none}}
+dialog.flash{max-width:min(860px,calc(100vw - 32px));max-height:calc(100vh - 48px);overflow:auto;border:1px solid var(--line);border-radius:10px;padding:20px 22px;background:var(--paper,#fff);color:var(--ink)}
+dialog.flash::backdrop{background:rgba(10,20,40,.45)}
+dialog.flash h4{margin:16px 0 6px}
+dialog.flash table.det td.num,dialog.flash table.det th.num{text-align:right;white-space:nowrap}

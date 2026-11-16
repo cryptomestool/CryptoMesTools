@@ -273,7 +273,7 @@
     }).join("");
     var stato = (K.avanzamento ? '<p class="stato" id="avanzSenza">' + esc(K.avanzamento) + "…</p>" : '<p class="stato" id="avanzSenza" hidden></p>') +
       (K.errore ? '<p class="stato" style="color:var(--hi)">' + esc(K.errore) + "</p>" : "") +
-      (K.riepilogo && daPiatt ? '<p class="stato"><b>Transazioni ricostruite senza Koinly</b>: ' + esc(K.riepilogo) + "</p>" : "") +
+      (K.riepilogo && daPiatt ? '<p class="stato"><b>Transazioni ricostruite senza Koinly</b>: ' + esc(K.riepilogo) + (K.flash ? ' <button type="button" class="btnlink" id="apriFlash">Rivedi il riepilogo</button>' : "") + "</p>" : "") +
       (esiti ? '<ul class="small" style="margin:6px 0 0;padding-left:18px">' + esiti + "</ul>" : "") +
       (K.avvisi.length ? '<p class="small" style="color:var(--mid)">' + K.avvisi.map(esc).join("<br>") + "</p>" : "");
     return '<div class="panel" style="margin-top:14px"><h3 style="margin-top:0">Senza Koinly: piattaforme e analisi on-chain</h3><p class="small">In alternativa al file delle transazioni di Koinly. Le transazioni si ricostruiscono dai CSV esportati dalle piattaforme e, per i wallet, dalla blockchain (analisi on-chain). I trasferimenti tra wallet e piattaforme del cliente si abbinano da soli, per hash o per importo: così i dati si riconciliano. I prezzi in euro mancanti sono quelli di chiusura del giorno su Binance, in euro o in USDT al cambio BCE. I saldi al 1/1 e al 31/12 si ricostruiscono dalle transazioni. Tutti questi valori sono stimati: verificateli e correggeteli in «Verifiche e riconciliazione», qui sotto. Se caricate i report dei saldi Koinly, valgono quelli.</p>' +
@@ -375,9 +375,72 @@
       K.riepilogo = mov.length.toLocaleString("it-IT") + " movimenti dal " + it(PZ.giorno(mov[0].ts)) + " al " + it(PZ.giorno(mov[mov.length - 1].ts)) + "; " +
         (ab.perHash + ab.perImporto) + " trasferimenti tra wallet e piattaforme abbinati" + (ab.doppi ? ", " + ab.doppi + " doppioni tolti" : "") + "; " + cv.stimati.toLocaleString("it-IT") + " valori in euro stimati" +
         (cv.senzaValore ? ", " + cv.senzaValore + " senza prezzo" : "") + "; saldi ricostruiti per gli anni " + anni[0] + (anni.length > 1 ? "–" + anni[anni.length - 1] : "") + ".";
-    } catch (e) { K.errore = e.message || String(e); }
+      K.flash = htmlFlash(mov, ab, cv, nFile, nW);
+    } catch (e) { K.errore = e.message || String(e); K.flash = null; }
     K.lavoro = false; K.avanzamento = "";
     scegliAnno(); ricalcola(); render();
+    if (K.flash && !K.errore) mostraFlash();
+  }
+  /* primo colpo d'occhio dopo la ricostruzione: che cosa è stato letto, che operazioni ci sono e le giacenze al 31/12 */
+  function htmlFlash(mov, ab, cv, nFile, nW) {
+    var K = S.senza, fiat = function (s) { return D.FIAT.indexOf(String(s).toUpperCase()) >= 0; };
+    var n = { acquisti: 0, vendite: 0, permute: 0, entrate: 0, uscite: 0, interni: 0, valuta: 0 };
+    var soloValuta = function (m) { return m.voci.filter(function (v) { return v.lato !== "fee"; }).every(function (v) { return fiat(v.simbolo); }); };
+    var qIt = function (t) { return String(t).replace(".", ","); };
+    mov.forEach(function (m) {
+      if (m.tipo === "transfer") n.interni++;
+      else if ((m.tipo === "deposit" || m.tipo === "withdrawal") && soloValuta(m)) n.valuta++;
+      else if (m.tipo === "deposit") n.entrate++;
+      else if (m.tipo === "withdrawal") n.uscite++;
+      else if (m.tipo === "trade") {
+        var da = m.voci.filter(function (v) { return v.lato === "da"; }), a = m.voci.filter(function (v) { return v.lato === "a"; });
+        if (da.some(function (v) { return fiat(v.simbolo); })) n.acquisti++; else if (a.some(function (v) { return fiat(v.simbolo); })) n.vendite++; else n.permute++;
+      }
+    });
+    var fonti = {};
+    mov.forEach(function (m) { (m.walletDa === m.walletA ? [m.walletDa] : [m.walletDa, m.walletA]).forEach(function (w) { if (!w) return; var f = fonti[w] || (fonti[w] = { n: 0, da: m.ts, a: m.ts }); f.n++; f.a = m.ts; }); });
+    var righeFonti = Object.keys(fonti).map(function (w) { var f = fonti[w]; return "<tr><td>" + esc(w) + '</td><td class="num">' + f.n.toLocaleString("it-IT") + "</td><td>" + it(PZ.giorno(f.da)) + " – " + it(PZ.giorno(f.a)) + "</td></tr>"; }).join("");
+    var saldiWallet = K.righe.map(function (w, i) { var l = K.letti[w.id]; return l && !l.errore && l.saldo && l.saldo.length ? "<li><b>" + esc(w.nome.trim() || "Wallet " + (i + 1)) + "</b>: " + esc(l.saldo.slice(0, 8).join(", ")) + (l.saldo.length > 8 ? " e altre " + (l.saldo.length - 8) : "") + "</li>" : ""; }).join("");
+    var fine = S.saldiFile.filter(function (z) { return z.r && z.r.tipoSaldi === "fine"; });
+    var righeAnni = fine.map(function (z) {
+      var sa = z.r.saldi.filter(function (x) { return !fiat(x.simbolo); }).slice().sort(function (x, y) { return (y.valore || 0) - (x.valore || 0); });
+      var tot = sa.reduce(function (t, x) { return t + (x.valore || 0); }, 0);
+      var elenco = sa.slice(0, 5).map(function (x) { return esc(x.simbolo) + " " + esc(qIt(x.quantitaTesto)) + (x.valore ? " (" + E(x.valore, 0) + ")" : ""); }).join(", ") + (sa.length > 5 ? " e altre " + (sa.length - 5) : "");
+      return "<tr><td>" + esc(z.data.slice(0, 4)) + "</td><td>" + (elenco || '<span class="muted">nessuna giacenza</span>') + '</td><td class="num">' + E(tot, 0) + "</td><td>" + (z.ricostruito ? "ricostruiti" : "report Koinly") + "</td></tr>";
+    }).join("");
+    var Q = VISTE.indexOf("modelli");
+    return '<h3 style="margin-top:0">Ricostruzione completata</h3>' +
+      '<p>' + mov.length.toLocaleString("it-IT") + " movimenti dal " + it(PZ.giorno(mov[0].ts)) + " al " + it(PZ.giorno(mov[mov.length - 1].ts)) + ", da " + nFile + " file e " + nW + " wallet.</p>" +
+      '<table class="det"><tbody>' +
+      "<tr><td>Acquisti con euro o valuta</td><td class=\"num\">" + n.acquisti + "</td><td>Vendite per euro o valuta</td><td class=\"num\">" + n.vendite + "</td></tr>" +
+      "<tr><td>Permute tra cripto</td><td class=\"num\">" + n.permute + "</td><td>Trasferimenti tra wallet del cliente</td><td class=\"num\">" + n.interni + " <span class=\"small muted\">(" + ab.perHash + " per hash, " + ab.perImporto + " per importo)</span></td></tr>" +
+      "<tr><td>Cripto entrate da fuori</td><td class=\"num\">" + n.entrate + "</td><td>Cripto uscite verso fuori</td><td class=\"num\">" + n.uscite + "</td></tr>" +
+      "<tr><td>Versamenti e prelievi di euro o valuta</td><td class=\"num\">" + n.valuta + "</td><td></td><td></td></tr>" +
+      "<tr><td>Valori in euro stimati</td><td class=\"num\">" + cv.stimati + "</td><td>Senza prezzo</td><td class=\"num\">" + cv.senzaValore + "</td></tr></tbody></table>" +
+      (righeFonti ? '<h4>Per wallet e piattaforma</h4><div class="scroll"><table class="det"><thead><tr><th>Wallet o piattaforma</th><th class="num">Movimenti</th><th>Periodo</th></tr></thead><tbody>' + righeFonti + "</tbody></table></div>" : "") +
+      (righeAnni ? '<h4>Giacenze al 31 dicembre</h4><div class="scroll"><table class="det"><thead><tr><th>Anno</th><th>Cripto (le principali per valore)</th><th class="num">Valore</th><th>Fonte</th></tr></thead><tbody>' + righeAnni + "</tbody></table></div>" : "") +
+      (saldiWallet ? '<h4>Saldo attuale dei wallet letti on-chain</h4><ul class="small">' + saldiWallet + "</ul>" : "") +
+      (K.avvisi.length ? '<p class="small" style="color:var(--hi)">' + K.avvisi.map(esc).join("<br>") + "</p>" : "") +
+      (n.entrate + n.uscite ? '<p class="small">Entrate e uscite «da fuori» sono movimenti verso indirizzi o piattaforme non caricati: se sono del cliente, aggiungeteli; gli altri si chiariscono in «Verifiche e riconciliazione».</p>' : "") +
+      '<p class="small muted">Valori stimati ai prezzi di chiusura giornalieri: da verificare prima di usarli.</p>' +
+      '<div class="toolbar"><button type="button" class="btn gold" data-flashvai="' + Q + '">Vai ai quadri RW e RT</button> <button type="button" class="btn ghost" data-flashchiudi>Chiudi</button></div>';
+  }
+  function mostraFlash() {
+    var d = document.getElementById("flashRicostruzione");
+    if (!d) { d = document.createElement("dialog"); d.id = "flashRicostruzione"; d.className = "flash"; document.body.appendChild(d); }
+    d.innerHTML = S.senza.flash;
+    if (d.showModal) { if (!d.open) d.showModal(); } else d.setAttribute("open", "");
+    d.onclick = function (e) {
+      var t = e.target;
+      if (t === d || t.closest("[data-flashchiudi]")) d.close ? d.close() : d.removeAttribute("open");
+      else if (t.closest("[data-flashvai]")) { d.close ? d.close() : d.removeAttribute("open"); S.tab = +t.closest("[data-flashvai]").getAttribute("data-flashvai"); render(); window.scrollTo(0, 0); }
+    };
+  }
+  /* ricomincia da capo: cancella tutto ciò che è stato caricato (dopo conferma) e ricarica la pagina */
+  function ricominciaDaCapo() {
+    if (!window.confirm("Ricominciare da capo?\n\nTutti i file caricati, i wallet, le correzioni e i dati inseriti saranno cancellati da questa pagina. Se vi servono, usate prima «Salva il lavoro in un file».")) return;
+    try { localStorage.removeItem("koinlyPercorso"); } catch (e) {}
+    location.reload();
   }
   function viewCaricamento() {
     var B = S.banca;
@@ -1996,6 +2059,7 @@
   }
 
   /* ---------- eventi ---------- */
+  var bRic = document.getElementById("ricomincia"); if (bRic) bRic.addEventListener("click", ricominciaDaCapo);
   document.getElementById("steps").addEventListener("click", function (e) { var b = e.target.closest("[data-tab]"); if (b) { S.tab = +b.getAttribute("data-tab"); render(); } });
   // «Dettaglio dei calcoli»: il contenuto (costi LIFO, detenzione) si costruisce quando si apre
   app.addEventListener("toggle", function (e) {
@@ -2067,6 +2131,7 @@
     else if (t.id === "leggiSenza") ricostruisci();
     else if (t.id === "analisiOnchain") analisiOnchain(false);
     else if (t.id === "aggiungiWallet") { nuovoWallet(); render(); }
+    else if (t.id === "apriFlash") mostraFlash();
     else if (t.matches("[data-wt]")) { var wt = +t.getAttribute("data-wt"); S.senza.righe = S.senza.righe.filter(function (x) { return x.id !== wt; }); delete S.senza.letti[wt]; if (!S.senza.righe.length) nuovoWallet(); render(); }
     else if (t.matches("[data-toglipiatt]")) { S.senza.file.splice(+t.getAttribute("data-toglipiatt"), 1); render(); }
     else if (t.matches("[data-togli]")) { var s = t.getAttribute("data-togli"); S[s] = null; S.errore[s] = null; if (s === "tx") { S.anno = null; S.saldiFile = S.saldiFile.filter(function (z) { return !z.ricostruito; }); } scegliAnno(); ricalcola(); render(); }
