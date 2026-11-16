@@ -30,7 +30,7 @@ const CSV = '"txid","refid","time","type","subtype","aclass","asset","wallet","a
 t("riconoscimento del ledger e dell'elenco «Trades»", () => {
   assert.equal(P.riconosci(CSV), "kraken");
   assert.equal(P.riconosci('"txid","ordertxid","pair","time","type","ordertype","price","cost","fee","vol","margin","misc","ledgers"\n'), "kraken-scambi");
-  assert.equal(P.krakenSim("XXBT"), "BTC"); assert.equal(P.krakenSim("ETH2.S"), "ETH"); assert.equal(P.krakenSim("DOT.F"), "DOT"); assert.equal(P.krakenSim("USD.HOLD"), "USD"); assert.equal(P.krakenSim("ZETA"), "ZETA");
+  assert.equal(P.krakenSim("XXBT"), "BTC"); assert.equal(P.krakenSim("ETH2.S"), "ETH"); assert.equal(P.krakenSim("DOT.F"), "DOT"); assert.equal(P.krakenSim("USD.HOLD"), "USD"); assert.equal(P.krakenSim("ZETA"), "ZETA"); assert.equal(P.krakenSim("LUNA"), "LUNC"); assert.equal(P.krakenSim("LUNA2"), "LUNA");
 });
 
 t("ledger: scambi, acquisti rapidi, staking, interni, prelievi, margine", () => {

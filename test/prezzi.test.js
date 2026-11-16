@@ -98,5 +98,21 @@ const mov = [
     assert.equal(P2.prezzo("POL", "2023-06-01").eur, 0.9 * 0.8);
     assert.equal(P2.prezzo("POL", "2024-10-01").eur, 0.4 * 0.8);
   });
+  // Terra Classic: LUNC dal settembre 2022; prima del crollo (fino al 12/05/2022) la vecchia serie LUNA; mai la nuova LUNA
+  const json3 = (url) => {
+    if (url.indexOf("frankfurter") >= 0) return Promise.resolve({ rates: { "2022-01-15": { USD: 1.25 }, "2022-07-01": { USD: 1.25 }, "2023-12-31": { USD: 1.25 } } });
+    const sym = /symbol=([A-Z]+)/.exec(url)[1];
+    const serie = { LUNCUSDT: [k("2023-12-31", 0.00014)], LUNAUSDT: [k("2022-01-15", 87), k("2022-07-01", 2), k("2023-12-31", 0.83)] };
+    if (!serie[sym]) return Promise.resolve(null);
+    const st = +/startTime=(\d+)/.exec(url)[1], en = +/endTime=(\d+)/.exec(url)[1];
+    return Promise.resolve(serie[sym].filter((x) => x[0] >= st && x[0] <= en));
+  };
+  const P3 = Z.crea({ json: json3 });
+  await P3.prepara([{ simbolo: "LUNC", giorno: "2022-01-15" }, { simbolo: "LUNC", giorno: "2022-07-01" }, { simbolo: "LUNC", giorno: "2023-12-31" }]);
+  t("LUNC: vecchia serie LUNA solo prima del crollo, mai la nuova Terra", () => {
+    assert.equal(P3.prezzo("LUNC", "2022-01-15").eur, 87 * 0.8);
+    assert.equal(P3.prezzo("LUNC", "2022-07-01"), null);
+    assert.equal(P3.prezzo("LUNC", "2023-12-31").eur, 0.00014 * 0.8);
+  });
   console.log(n + " prove superate");
 })().catch((e) => { console.log("ERRORE", e && e.stack || e); });

@@ -18,7 +18,9 @@
   var GIORNO = 86400000;
   /* token che valgono come un'altra cripto (versioni «wrapped» o ponte delle reti EVM) e nomi precedenti (POL era MATIC fino al 2024) */
   var SINONIMI = { WETH: "ETH", WBTC: "BTC", BTCB: "BTC", CBBTC: "BTC", WAVAX: "AVAX", WMATIC: "MATIC", WPOL: "POL", WBNB: "BNB", STETH: "ETH", WSTETH: "ETH", "USDC.E": "USDC", USDBC: "USDC", "USDT.E": "USDT", "DAI.E": "DAI", "WETH.E": "ETH" };
-  var RIPIEGO = { POL: "MATIC" };
+  /* nome precedente della stessa cripto per i giorni non coperti: POL era MATIC fino al 2024; LUNC (Terra Classic) era LUNA fino
+     al crollo del maggio 2022, poi la coppia LUNA di Binance è passata alla nuova Terra: la vecchia serie vale solo fino al 12/05/2022 */
+  var RIPIEGO = { POL: { s: "MATIC" }, LUNC: { s: "LUNA", fino: "2022-05-12" } };
   function norm(s) { s = String(s || "").toUpperCase().trim(); return SINONIMI[s] || s; }
 
   function giorno(ts) { return new Date(ts).toISOString().slice(0, 10); }
@@ -74,8 +76,8 @@
         if (RIPIEGO[s]) {
           var pr = function (serieDa) { return serieDa ? Object.keys(serieDa).sort()[0] : null; }, inizio = [pr(eur), pr(usdt)].filter(Boolean).sort()[0];
           if (!inizio || inizio > p.da) {
-            var vecchia = null; try { vecchia = await caricaSerie(RIPIEGO[s] + "USDT", p.da, p.a); } catch (e) { vecchia = null; }
-            if (vecchia) { usdt = usdt || {}; Object.keys(vecchia).forEach(function (g) { if (usdt[g] == null && !(eur && eur[g] != null)) usdt[g] = vecchia[g]; }); }
+            var rp = RIPIEGO[s], vecchia = null, fino = rp.fino && rp.fino < p.a ? rp.fino : p.a; if (p.da <= fino) { try { vecchia = await caricaSerie(rp.s + "USDT", p.da, fino); } catch (e) { vecchia = null; } }
+            if (vecchia) { usdt = usdt || {}; Object.keys(vecchia).forEach(function (g) { if (g <= fino && usdt[g] == null && !(eur && eur[g] != null)) usdt[g] = vecchia[g]; }); }
           }
         }
         serie[s] = { da: p.da, a: p.a, eur: eur || {}, usdt: usdt || {} };

@@ -427,9 +427,9 @@
       if (!mov.length) throw new Error("Nessun movimento: caricate i CSV delle piattaforme o indicate almeno un wallet e avviate l'analisi on-chain.");
       mov.sort(function (a, b) { return a.ts - b.ts; });
       mov.forEach(function (m, j) { m.riga = j + 1; });
-      // prezzi e saldi: dall'anno del primo movimento all'ultimo anno chiuso
+      // prezzi e saldi: dall'anno del primo movimento all'anno in corso (saldi al 31/12 provvisori, all'ultimo prezzo disponibile)
       var oggi = new Date().getUTCFullYear(), primo = new Date(mov[0].ts).getUTCFullYear(), anni = [];
-      for (var a = primo; a <= Math.max(primo, oggi - 1); a++) anni.push(a);
+      for (var a = primo; a <= Math.max(primo, oggi); a++) anni.push(a);
       var P = PZ.crea({ json: jsonPrezzi, avanzamento: function (t) { avanzSenza("prezzi: " + t); } });
       await P.prepara(PZ.richieste(mov, anni));
       var cv = PZ.completaValori(mov, P);

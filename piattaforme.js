@@ -495,8 +495,8 @@
   /* ---------- Kraken (ledgers: CSV «Ledgers» dell'esportazione o API privata Ledgers, stesse colonne) ----------
      Ogni riga è una variazione di saldo; le righe con lo stesso refid sono una sola operazione (le due gambe di uno scambio).
      amount con segno, fee a parte (positiva, sempre addebitata sull'asset della riga). Gli asset hanno i nomi storici di Kraken
-     (XXBT, XETH, ZEUR…) e i suffissi dei conti interni (.S staking, .M opt-in rewards, .F earn flessibile, .B bonded, .HOLD). */
-  var KRAKEN_NOMI = { XBT: "BTC", XXBT: "BTC", XDG: "DOGE", XXDG: "DOGE", XETH: "ETH", ETH2: "ETH", XLTC: "LTC", XXRP: "XRP", XXLM: "XLM", XETC: "ETC", XMLN: "MLN", XREP: "REP", XZEC: "ZEC", XXMR: "XMR", XICN: "ICN", XNMC: "NMC", XXVN: "XVN", ZEUR: "EUR", ZUSD: "USD", ZGBP: "GBP", ZCAD: "CAD", ZJPY: "JPY", ZAUD: "AUD", ZCHF: "CHF" };
+     (XXBT, XETH, ZEUR…; su Kraken «LUNA» è Terra Classic, cioè LUNC, e «LUNA2» la nuova Terra) e i suffissi dei conti interni (.S staking, .M opt-in rewards, .F earn flessibile, .B bonded, .HOLD). */
+  var KRAKEN_NOMI = { XBT: "BTC", XXBT: "BTC", XDG: "DOGE", XXDG: "DOGE", XETH: "ETH", ETH2: "ETH", XLTC: "LTC", XXRP: "XRP", XXLM: "XLM", XETC: "ETC", XMLN: "MLN", XREP: "REP", XZEC: "ZEC", XXMR: "XMR", XICN: "ICN", XNMC: "NMC", XXVN: "XVN", ZEUR: "EUR", ZUSD: "USD", ZGBP: "GBP", ZCAD: "CAD", ZJPY: "JPY", ZAUD: "AUD", ZCHF: "CHF", LUNA: "LUNC", LUNA2: "LUNA" };
   function krakenSim(a) { var s = String(a || "").trim().toUpperCase().replace(/\.(S|M|F|P|B|HOLD|EQ)$/, ""); return KRAKEN_NOMI[s] || s; }
   var KRAKEN_INTERNI = /^(spottostaking|stakingfromspot|stakingtospot|spotfromstaking|allocation|deallocation|autoallocation|migration)$/i;
   function leggiKraken(testo) {
