@@ -225,7 +225,7 @@
   function scegliPercorso() {
     if (!S.percorso) return '<div class="panel percorso"><h2 style="margin-top:0">Che cosa dovete fare?</h2><p class="lead">Scegliete il percorso: il programma mostra solo i file da caricare e i documenti che servono.</p><div class="cards">' +
       Object.keys(PERCORSI).map(function (k) { return '<button type="button" class="card scelta" data-percorso="' + k + '"><div class="v">' + esc(PERCORSI[k].titolo) + '</div><div class="k">' + esc(PERCORSI[k].testo) + "</div></button>"; }).join("") + "</div></div>";
-    return '<div class="panel percorso"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Percorso: ' + esc(PERCORSI[S.percorso].titolo) + '</h3><button type="button" class="btnlink small" data-percorso="">Cambia percorso</button></div>' + daProdurre() + "</div>";
+    return '<div class="panel percorso"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Percorso: ' + esc(PERCORSI[S.percorso].titolo) + '</h3><button type="button" class="btnlink small" data-percorso="">Cambia percorso</button></div><p class="small" style="margin:4px 0 0">' + esc(PERCORSI[S.percorso].testo) + "</p></div>";
   }
   /* documenti da produrre nel percorso scelto, con lo stato e la scheda dove si preparano */
   // provenienza dei fondi: servono redditi indicati nelle dichiarazioni caricate o altre fonti con un importo
@@ -261,13 +261,13 @@
       x = el.length ? el : null;
       if (x) stato = '<p class="stato">' + el.map(function (z) { return "<b>" + esc(z.nome) + "</b> · saldi al " + it(z.data) + " · " + z.r.saldi.length + " cripto, " + E(z.r.valoreCripto) + (z.r.avvisi.length ? '<br><span style="color:var(--mid)">' + z.r.avvisi.map(esc).join("<br>") + "</span>" : "") + ' <button type="button" class="btnlink small" data-toglisaldi="' + z.data + '">togli</button>'; }).join("<br>") + "</p>";
     }
-    return '<div class="slot' + (err ? " err" : x ? " ok" : "") + '"><span class="req">' + (obbl ? "Obbligatorio" : "Facoltativo") + "</span><h3>" + titolo + '</h3><p class="small muted" style="margin:0">' + testo + "</p>" +
+    return '<div class="slot' + (err ? " err" : x ? " ok" : "") + '"><span class="req">' + "Koinly" + "</span><h3>" + titolo + '</h3><p class="small muted" style="margin:0">' + testo + "</p>" +
       '<input type="file" accept="' + accetta + '" data-slot="' + id + '"' + (id === "tx" ? "" : " multiple") + ">" + stato + (x && id === "tx" ? '<button type="button" class="btnlink small" data-togli="' + id + '">Togli il file</button>' : "") + "</div>";
   }
   /* Complete tax report Koinly: facoltativo, serve al confronto cessione per cessione (Costi di carico, Sanzioni, Quadri, memoria) */
   function slotKoinlyCes() {
     var x = S.koinlyCes, err = S.koinlyCesErrore;
-    return '<div class="slot' + (err ? " err" : x ? " ok" : "") + '"><span class="req">Facoltativo</span><h3>Complete tax report Koinly</h3><p class="small muted" style="margin:0">PDF del «Complete tax report» (anche di più anni): le sue cessioni si confrontano una per una con quelle ricostruite, nella scheda Costi di carico.</p>' +
+    return '<div class="slot' + (err ? " err" : x ? " ok" : "") + '"><span class="req">Koinly</span><h3>Complete tax report</h3><p class="small muted" style="margin:0">PDF del «Complete tax report» (anche di più anni): le sue cessioni si confrontano una per una con quelle ricostruite, nella scheda Costi di carico.</p>' +
       '<input type="file" accept=".pdf" data-koinlyces>' + (err ? '<p class="stato" style="color:var(--hi)">' + esc(err) + "</p>" : x ? '<p class="stato"><b>' + esc(x.nome) + "</b><br>periodo " + esc(x.periodo || "") + " · " + x.cessioni.length + " cessioni · date in " + (x.fuso === "UTC" ? "UTC" : "ora italiana") + '</p><button type="button" class="btnlink small" id="togliKoinlyCes">Togli il file</button>' : "") + "</div>";
   }
   /* riquadro di caricamento generico: titolo, obbligatorio o no, che cosa caricare, campo file e stato */
@@ -322,8 +322,8 @@
       (K.riepilogo && daPiatt ? '<p class="stato"><b>Transazioni ricostruite senza Koinly</b>: ' + esc(K.riepilogo) + (K.flash ? ' <button type="button" class="btnlink" id="apriFlash">Rivedi il riepilogo</button>' : "") + "</p>" : "") +
       (esiti ? '<ul class="small" style="margin:6px 0 0;padding-left:18px">' + esiti + "</ul>" : "") +
       (K.avvisi.length ? '<p class="small" style="color:var(--mid)">' + K.avvisi.map(esc).join("<br>") + "</p>" : "");
-    return '<div class="panel" style="margin-top:14px"><h3 style="margin-top:0">Senza Koinly: piattaforme e analisi on-chain</h3><p class="small">In alternativa al file delle transazioni di Koinly. Le transazioni si ricostruiscono dai CSV esportati dalle piattaforme e, per i wallet, dalla blockchain (analisi on-chain). I trasferimenti tra wallet e piattaforme del cliente si abbinano da soli, per hash o per importo: così i dati si riconciliano. I prezzi in euro mancanti sono quelli di chiusura del giorno su Binance, in euro o in USDT al cambio BCE. I saldi al 1/1 e al 31/12 si ricostruiscono dalle transazioni. Tutti questi valori sono stimati: verificateli e correggeteli in «Verifiche e riconciliazione», qui sotto. Se caricate i report dei saldi Koinly, valgono quelli.</p>' +
-      '<div class="slots">' + riquadro("File delle piattaforme", "Facoltativo", "CSV di Binance (Transaction History, con la Deposit e Withdraw History e il report fiscale), Coinbase e Coinbase Pro, Nexo, Young Platform, Revolut (sezione Cripto e Revolut X), Relai, Ledger Live, BitBoxApp ed Etherscan. Anche più file e più anni insieme: le righe ripetute contano una volta. Un CSV con l'elenco delle chiavi pubbliche («Portafoglio; Tipo; Chiave pubblica estesa») aggiunge i wallet qui sotto.",
+    return '<div class="panel" style="margin-top:14px"><h3 style="margin-top:0">B. Senza Koinly: piattaforme e analisi on-chain</h3><p class="small">In alternativa alla strada A (Koinly). Le transazioni si ricostruiscono dai CSV esportati dalle piattaforme e, per i wallet, dalla blockchain (analisi on-chain). I trasferimenti tra wallet e piattaforme del cliente si abbinano da soli, per hash o per importo: così i dati si riconciliano. I prezzi in euro mancanti sono quelli di chiusura del giorno su Binance, in euro o in USDT al cambio BCE. I saldi al 1/1 e al 31/12 si ricostruiscono dalle transazioni. Tutti questi valori sono stimati: verificateli e correggeteli in «Verifiche e riconciliazione», qui sotto. Se caricate i report dei saldi Koinly, valgono quelli.</p>' +
+      '<div class="slots">' + riquadro("File delle piattaforme", "Piattaforme", "CSV di Binance (Transaction History, con la Deposit e Withdraw History e il report fiscale), Coinbase e Coinbase Pro, Nexo, Young Platform, Revolut (sezione Cripto e Revolut X), Relai, Ledger Live, BitBoxApp ed Etherscan. Anche più file e più anni insieme: le righe ripetute contano una volta. Un CSV con l'elenco delle chiavi pubbliche («Portafoglio; Tipo; Chiave pubblica estesa») aggiunge i wallet qui sotto.",
         '<input type="file" multiple accept=".csv,text/csv" data-piatt>', K.file.length ? '<p class="stato">' + K.file.map(function (f, i) { return "<b>" + esc(f.nome) + '</b> <button type="button" class="btnlink small" data-toglipiatt="' + i + '">togli</button>'; }).join("<br>") + "</p>" : "", false, K.file.length) + "</div>" +
       '<h3 style="margin:16px 0 4px">Wallet per l\'analisi on-chain</h3><p class="small" style="margin:0 0 6px">Per ogni wallet: nome, blockchain e chiave pubblica o indirizzo. <b>Bitcoin</b>: chiave pubblica estesa (xpub, ypub, zpub; per Taproot scrivete «Taproot» nel nome) oppure uno o più indirizzi. <b>Reti EVM</b> (Ethereum, Base, Polygon, Arbitrum, Optimism, zkSync, Avalanche): l\'indirizzo 0x…, letto sulla rete scelta o su «Tutte le reti EVM». Le chiavi restano in questo browser: ai servizi pubblici (mempool.space, Blockscout, Routescan) arrivano solo gli indirizzi, con una richiesta ogni 1-2 secondi. Le chiavi private e le frasi di recupero non vanno mai inserite.</p>' +
       '<div class="scroll"><table class="det"><thead><tr><th>Wallet</th><th>Blockchain</th><th>Chiave pubblica o indirizzo</th><th>Esito</th><th></th></tr></thead><tbody>' + righe + "</tbody></table></div>" +
@@ -484,21 +484,34 @@
   }
   /* ricomincia da capo: cancella tutto ciò che è stato caricato (dopo conferma) e ricarica la pagina */
   function ricominciaDaCapo() {
-    if (!window.confirm("Ricominciare da capo?\n\nTutti i file caricati, i wallet, le correzioni e i dati inseriti saranno cancellati da questa pagina. Se vi servono, usate prima «Salva il lavoro in un file».")) return;
-    try { localStorage.removeItem("koinlyPercorso"); } catch (e) {}
-    location.reload();
+    // finestra dell'app e non window.confirm: dentro l'iframe del sito dello studio i browser possono bloccare le finestre di conferma
+    var d = document.getElementById("confermaRicomincia");
+    if (!d) { d = document.createElement("dialog"); d.id = "confermaRicomincia"; d.className = "flash"; document.body.appendChild(d); }
+    d.innerHTML = '<h3 style="margin-top:0">Ricominciare da capo?</h3><p>Tutti i file caricati, i wallet, le correzioni e i dati inseriti saranno cancellati da questa pagina e si riparte dalla scelta iniziale: dichiarazione nei termini, ravvedimento o risposta all\'Agenzia.</p><p class="small">Se vi servono, usate prima «Salva il lavoro in un file».</p>' +
+      '<div class="toolbar"><button type="button" class="btn gold" data-ricomincia-si>Sì, ricomincia da capo</button> <button type="button" class="btn ghost" data-ricomincia-no>Annulla</button></div>';
+    var chiudi = function () { if (d.close) d.close(); else d.removeAttribute("open"); };
+    d.onclick = function (e) {
+      if (e.target === d || e.target.closest("[data-ricomincia-no]")) chiudi();
+      else if (e.target.closest("[data-ricomincia-si]")) {
+        try { localStorage.removeItem("koinlyPercorso"); } catch (x) {}
+        S.percorso = null; chiudi();
+        location.reload();
+      }
+    };
+    if (d.showModal) { if (!d.open) d.showModal(); } else d.setAttribute("open", "");
   }
+
   function viewCaricamento() {
     var B = S.banca;
-    var h = scegliPercorso() + '<h2>Caricamento file</h2><p class="lead">Qui si caricano tutti i file della pratica. Per ciascuno è indicato che cosa contiene, dove si scarica e in quale scheda si usa. Le transazioni e i saldi di Koinly sono indispensabili; gli altri file aggiungono riscontri e quadri.</p>' +
+    var h = scegliPercorso() + '<h2>Caricamento file</h2><p class="lead">Le transazioni si caricano in uno dei due modi, <b>in alternativa</b>: <b>A. con Koinly</b> (transazioni, saldi di inizio anno, saldi di fine anno, complete tax report e altri report) oppure <b>B. senza Koinly</b> (file delle piattaforme e analisi on-chain dei wallet). Basta una delle due strade; si possono anche unire. Gli altri file (broker esteri, banche, dichiarazioni) aggiungono riscontri e quadri. Per ciascun file è indicato che cosa contiene e dove si scarica.</p>' +
       '<div class="banner beta-avviso"><strong>Versione beta</strong><p>CryptoMesTools è in fase di test: i risultati vanno verificati con lo studio prima di usarli per la dichiarazione o per qualsiasi versamento. Segnalazioni e suggerimenti sono benvenuti.</p></div>' +
       '<div class="banner"><strong>Riservatezza</strong><p>I file restano in questo browser: non vengono salvati né inviati in rete (con la lettura senza Koinly partono soltanto i simboli delle cripto con le date, per i prezzi, e gli indirizzi dei wallet, per l\'analisi on-chain). Non sapete quali file caricare? <button type="button" class="btnlink" data-tab="0">Leggete la guida</button>.</p></div>';
-    h += '<div class="panel"><h3 style="margin-top:0">Koinly</h3><div class="slots">' +
+    h += '<div class="panel"><h3 style="margin-top:0">A. Con Koinly</h3><p class="small" style="margin:0 0 8px">Transazioni, saldi di inizio anno, saldi di fine anno e complete tax report scaricati da Koinly, uno per ogni anno. In alternativa alla strada B.</p><div class="slots">' +
       slot("tx", "Transazioni", true, "CSV con tutte le transazioni di tutti gli anni, dal primo acquisto: «backup_transactions_koinly.csv» (Koinly › Transactions › esporta) oppure «transaction history». Serve a tutte le schede: periodi di detenzione, costi di carico, questionario.", ".csv,text/csv") +
       slot("inizio", "Saldi a inizio anno", true, "«Beginning of year holdings» in CSV (Koinly › Tax reports), uno per ogni anno da esaminare, anche più file insieme. Quantità e valori al 1° gennaio; il report di fine dell'anno precedente vale come saldo iniziale. Serve ai giorni di detenzione e all'IVACA (fino a 5 anni prima dell'ultimo) e dà i prezzi Koinly al questionario dell'Agenzia, per tutti gli anni richiesti.", ".csv,.pdf") +
       slot("fine", "Saldi a fine anno", true, "«End of year holdings» in CSV o «Complete tax report» in PDF, uno per ogni anno da esaminare (anche più file insieme): quantità e valori al 31/12, per il riscontro e il valore finale del quadro RW e per i prezzi del questionario dell'Agenzia.", ".csv,.pdf") +
       slotKoinlyCes() +
-      riquadro("Altri report Koinly", "Facoltativo", "CSV di «Income report», «Expenses report», «Gifts, donations &amp; lost assets» e «Other gains report» (Koinly › Tax reports), anche più file e più anni insieme. Dal 2023 i proventi dell'Income report (staking, reward, airdrop, interessi) entrano nel quadro RT delle cripto; l'Other gains (derivati) si riporta a scelta nel quadro RT al 26% o nel quadro RM. Commissioni, regali e perdite sono informazioni in più. I riepiloghi sono nella scheda «Quadri RW, RT, F24 e sanzioni».",
+      riquadro("Altri report", "Koinly", "CSV di «Income report», «Expenses report», «Gifts, donations &amp; lost assets» e «Other gains report» (Koinly › Tax reports), anche più file e più anni insieme. Dal 2023 i proventi dell'Income report (staking, reward, airdrop, interessi) entrano nel quadro RT delle cripto; l'Other gains (derivati) si riporta a scelta nel quadro RT al 26% o nel quadro RM. Commissioni, regali e perdite sono informazioni in più. I riepiloghi sono nella scheda «Quadri RW, RT, F24 e sanzioni».",
         '<input type="file" multiple accept=".csv,text/csv" data-kreport>', (S.reportErrore ? '<p class="stato" style="color:var(--hi)">' + esc(S.reportErrore) + "</p>" : "") + (S.report.length ? '<p class="stato">' + S.report.map(function (z) { return "<b>" + esc(z.nome) + "</b> · " + esc(z.r.titolo) + " " + (z.r.anno || "") + " · " + z.r.righe.length.toLocaleString("it-IT") + " righe, " + E(z.r.totale) + ' <button type="button" class="btnlink small" data-toglireport="' + esc(z.chiave) + '">togli</button>'; }).join("<br>") + "</p>" : ""), S.reportErrore, S.report.length) +
       "</div></div>" + pannelloSenzaKoinly() + pannelloMonitoraggio();
     var et = S.etoro;
