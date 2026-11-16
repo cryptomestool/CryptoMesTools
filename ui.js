@@ -324,7 +324,8 @@
       (K.avvisi.length ? '<p class="small" style="color:var(--mid)">' + K.avvisi.map(esc).join("<br>") + "</p>" : "");
     return '<div class="panel" style="margin-top:14px"><h3 style="margin-top:0">B. Senza Koinly: piattaforme e analisi on-chain</h3><p class="small">In alternativa alla strada A (Koinly). Le transazioni si ricostruiscono dai CSV esportati dalle piattaforme e, per i wallet, dalla blockchain (analisi on-chain). I trasferimenti tra wallet e piattaforme del cliente si abbinano da soli, per hash o per importo: così i dati si riconciliano. I prezzi in euro mancanti sono quelli di chiusura del giorno su Binance, in euro o in USDT al cambio BCE. I saldi al 1/1 e al 31/12 si ricostruiscono dalle transazioni. Tutti questi valori sono stimati: verificateli e correggeteli in «Verifiche e riconciliazione», qui sotto. Se caricate i report dei saldi Koinly, valgono quelli.</p>' +
       '<div class="slots">' + riquadro("File delle piattaforme", "Piattaforme", "CSV di Binance (Transaction History, con la Deposit e Withdraw History e il report fiscale), Coinbase e Coinbase Pro, Nexo, Young Platform, Revolut (sezione Cripto e Revolut X), Kraken (Ledgers), Relai, Ledger Live, BitBoxApp ed Etherscan. Anche più file e più anni insieme: le righe ripetute contano una volta. Un CSV con l'elenco delle chiavi pubbliche («Portafoglio; Tipo; Chiave pubblica estesa») aggiunge i wallet qui sotto.",
-        '<input type="file" multiple accept=".csv,text/csv" data-piatt>', K.file.length ? '<p class="stato">' + K.file.map(function (f, i) { return "<b>" + esc(f.nome) + '</b> <button type="button" class="btnlink small" data-toglipiatt="' + i + '">togli</button>'; }).join("<br>") + "</p>" : "", false, K.file.length) + "</div>" +
+        '<input type="file" multiple accept=".csv,text/csv" data-piatt>', K.file.length ? '<p class="stato">' + K.file.map(function (f, i) { return "<b>" + esc(f.nome) + '</b> <button type="button" class="btnlink small" data-toglipiatt="' + i + '">togli</button>'; }).join("<br>") + "</p>" +
+          '<div class="toolbar" style="margin-top:8px"><button type="button" class="btn gold" data-calcola' + (K.lavoro ? " disabled" : "") + ">" + (K.lavoro ? "Calcolo in corso…" : "Calcola") + "</button>" + (daPiatt && K.riepilogo ? ' <span class="small">Già calcolato: dopo aver aggiunto o tolto file, premete di nuovo «Calcola».</span>' : "") + "</div>" : "", false, K.file.length) + "</div>" +
       '<h3 style="margin:16px 0 4px">Kraken con la chiave API</h3><p class="small" style="margin:0 0 6px">In alternativa al CSV «Ledgers». Il cliente crea su Kraken (Impostazioni → API) una chiave con il solo permesso <b>«Query Ledger Entries»</b> (nessun permesso di prelievo o di trading) e vi dà la chiave API e la chiave privata. La firma delle richieste si calcola in questo browser: la chiave privata non viene inviata né salvata. Le richieste firmate passano dal collegamento del sito (Kraken non accetta chiamate dirette dalle pagine web), che le inoltra senza conservarle. I movimenti scaricati diventano un file «Kraken Ledgers (API)» tra i file delle piattaforme, che si può salvare per il fascicolo. Si possono caricare anche i CSV «Ledgers», pure per periodi sovrapposti: le operazioni presenti sia nel CSV sia nell\'API contano una volta. Dopo l\'uso conviene cancellare la chiave su Kraken.</p>' +
       '<div class="toolbar" style="flex-wrap:wrap;gap:6px"><input type="text" id="krakenChiave" autocomplete="off" spellcheck="false" placeholder="Chiave API (API Key)" style="flex:1;min-width:200px;font-family:var(--mono,monospace);font-size:12px"> <input type="password" id="krakenSegreto" autocomplete="new-password" spellcheck="false" placeholder="Chiave privata (Private Key)" style="flex:1;min-width:200px;font-family:var(--mono,monospace);font-size:12px"> <button type="button" class="btn ghost" id="scaricaKraken"' + (K.lavoro ? " disabled" : "") + '>Scarica i movimenti Kraken</button>' +
       (K.file.some(function (f) { return f.api === "kraken"; }) ? ' <button type="button" class="btnlink small" id="salvaKraken">salva il CSV scaricato</button>' : "") + "</div>" +
@@ -332,12 +333,38 @@
       '<h3 style="margin:16px 0 4px">Wallet per l\'analisi on-chain</h3><p class="small" style="margin:0 0 6px">Per ogni wallet: nome, blockchain e chiave pubblica o indirizzo. <b>Bitcoin</b>: chiave pubblica estesa (xpub, ypub, zpub; per Taproot scrivete «Taproot» nel nome) oppure uno o più indirizzi. <b>Reti EVM</b> (Ethereum, Base, Polygon, Arbitrum, Optimism, zkSync, Avalanche): l\'indirizzo 0x…, letto sulla rete scelta o su «Tutte le reti EVM». Le chiavi restano in questo browser: ai servizi pubblici (mempool.space, Blockscout, Routescan) arrivano solo gli indirizzi, con una richiesta ogni 1-2 secondi. Le chiavi private e le frasi di recupero non vanno mai inserite.</p>' +
       '<div class="scroll"><table class="det"><thead><tr><th>Wallet</th><th>Blockchain</th><th>Chiave pubblica o indirizzo</th><th>Esito</th><th></th></tr></thead><tbody>' + righe + "</tbody></table></div>" +
       '<div class="toolbar" style="margin-top:8px"><button type="button" class="btn ghost" id="aggiungiWallet">+ Aggiungi wallet</button> <button type="button" class="btn gold" id="analisiOnchain"' + (K.lavoro ? " disabled" : "") + ">" + (K.lavoro ? "Analisi in corso…" : "Analisi on-chain") + "</button>" +
-      ' <button type="button" class="btn ghost" id="leggiSenza"' + (K.lavoro ? " disabled" : "") + ">Ricostruisci le transazioni</button>" +
+      ' <button type="button" class="btn ghost" data-calcola' + (K.lavoro ? " disabled" : "") + ">" + (K.lavoro ? "Calcolo in corso…" : "Calcola") + "</button>" +
       (daPiatt ? ' <span class="small">Sostituiscono il file Koinly delle transazioni.</span>' : "") + "</div>" + stato + "</div>";
   }
   function avanzSenza(t) {
     S.senza.avanzamento = t;
     var el = document.getElementById("avanzSenza"); if (el) { el.hidden = false; el.textContent = t + "…"; }
+    var f = document.getElementById("calcoloFase"); if (f) f.textContent = t.charAt(0).toUpperCase() + t.slice(1) + "…";
+  }
+  /* finestra «Calcolo in corso»: resta aperta finché il lavoro non finisce (letture on-chain, scarico Kraken, prezzi, saldi);
+     in caso di errore mostra il messaggio con il tasto per chiuderla */
+  var orologioCalcolo = null;
+  async function calcoloInizia(titolo) {
+    var d = document.getElementById("calcoloInCorso");
+    if (!d) { d = document.createElement("dialog"); d.id = "calcoloInCorso"; d.className = "flash calcolo"; document.body.appendChild(d); }
+    if (d.open && orologioCalcolo) { var h = d.querySelector("h3"); if (h && titolo) h.textContent = titolo; return; }
+    var inizio = Date.now();
+    d.innerHTML = '<div class="girella" aria-hidden="true"></div><h3 style="margin:0 0 6px">' + esc(titolo || "Calcolo in corso") + '</h3><p id="calcoloFase" style="margin:0">Avvio…</p>' +
+      '<p class="small muted" id="calcoloTempo" style="margin:8px 0 0">0 secondi · con molti movimenti o wallet servono alcuni minuti: lasciate aperta la pagina.</p>';
+    d.oncancel = function (e) { e.preventDefault(); };
+    if (d.showModal) { if (!d.open) d.showModal(); } else d.setAttribute("open", "");
+    clearInterval(orologioCalcolo);
+    orologioCalcolo = setInterval(function () { var s = Math.round((Date.now() - inizio) / 1000), el = document.getElementById("calcoloTempo"); if (el) el.firstChild.textContent = (s < 60 ? s + (s === 1 ? " secondo" : " secondi") : Math.floor(s / 60) + " min " + (s % 60) + " s") + " · con molti movimenti o wallet servono alcuni minuti: lasciate aperta la pagina."; }, 1000);
+    await new Promise(function (r) { setTimeout(r, 40); }); // il browser disegna la finestra prima dei calcoli
+  }
+  function calcoloFine(errore) {
+    clearInterval(orologioCalcolo); orologioCalcolo = null;
+    var d = document.getElementById("calcoloInCorso"); if (!d) return;
+    var chiudi = function () { if (d.close) d.close(); else d.removeAttribute("open"); };
+    if (!errore) return chiudi();
+    d.innerHTML = '<h3 style="margin:0 0 6px;color:var(--hi)">Calcolo non riuscito</h3><p style="margin:0">' + esc(errore) + '</p><div class="toolbar" style="margin-top:12px"><button type="button" class="btn gold" data-calcolochiudi>Chiudi</button></div>';
+    d.oncancel = null;
+    d.onclick = function (e) { if (e.target === d || e.target.closest("[data-calcolochiudi]")) chiudi(); };
   }
   function nuovoWallet(nome, rete, chiave) { var K = S.senza; K.righe.push({ id: K.prossimo++, nome: nome || "", rete: rete || "bitcoin", chiave: chiave || "" }); }
   /* blockchain dedotta dalla chiave incollata: Bitcoin per xpub e indirizzi bc1/1/3; per 0x… resta la rete EVM scelta (Ethereum se era Bitcoin) */
@@ -354,7 +381,7 @@
   /* analisi on-chain: legge dalla blockchain i wallet nuovi o cambiati (tutti con «rileggi»), poi ricostruisce */
   async function analisiOnchain(rileggi) {
     var K = S.senza; if (K.lavoro) return;
-    K.lavoro = true; K.errore = null; render();
+    K.lavoro = true; K.errore = null; render(); await calcoloInizia("Calcolo in corso: lettura dei wallet dalla blockchain");
     var btc = OC.creaRichiesta({ avviso: function (t) { avanzSenza("mempool.space: " + t); } });
     var evm = OC.creaRichiesta({ pausa: 2100, avviso: function (t) { avanzSenza("esploratore EVM: " + t); } });
     for (var i = 0; i < K.righe.length; i++) {
@@ -394,7 +421,7 @@
     var chiave = ch ? ch.value.trim() : "", segreto = sg ? sg.value.trim() : "";
     var err = KK.controllaChiave(chiave, segreto);
     if (err) { K.kraken = { errore: true, testo: err }; render(); return; }
-    K.lavoro = true; K.kraken = { testo: "Collegamento con Kraken…" }; render();
+    K.lavoro = true; K.kraken = { testo: "Collegamento con Kraken…" }; render(); await calcoloInizia("Calcolo in corso: scarico dei movimenti Kraken"); avanzSenza("collegamento con Kraken");
     try {
       var ledger = await KK.scaricaLedger({ chiave: chiave, segreto: segreto, avanzamento: function (t) { K.kraken = { testo: t + "…" }; avanzSenza(t); } });
       var n = Object.keys(ledger).length, oggi = new Date();
@@ -407,7 +434,7 @@
     chiave = segreto = "";
     K.lavoro = false; K.avanzamento = "";
     if (!K.kraken.errore) return ricostruisci();
-    render();
+    calcoloFine(K.kraken.testo); render();
   }
   function copiaMov(m) { return Object.assign({}, m, { voci: m.voci.map(function (v) { return Object.assign({}, v); }) }); }
   /* unisce file delle piattaforme e wallet letti, abbina i trasferimenti, completa i prezzi e ricostruisce i saldi */
@@ -416,7 +443,7 @@
     // wallet non ancora letti: prima l'analisi on-chain
     if (K.righe.some(function (w) { var l = K.letti[w.id]; return !controlloWallet(w).errore && (!l || l.firma !== firmaWallet(w)); })) return analisiOnchain(false);
     K.lavoro = true; K.errore = null; K.avvisi = []; K.esiti = null; K.riepilogo = "";
-    avanzSenza("ricostruzione delle transazioni"); render();
+    render(); await calcoloInizia("Calcolo in corso"); avanzSenza("lettura dei file e ricostruzione delle transazioni");
     try {
       var r = K.file.length ? PT.leggiFile(K.file) : { file: [], movimenti: [], scambiApp: [] };
       K.esiti = r.file.filter(function (e) { return e.piattaforma !== "Chiavi pubbliche"; });
@@ -449,8 +476,10 @@
         (cv.senzaValore ? ", " + cv.senzaValore + " senza prezzo" : "") + "; saldi ricostruiti per gli anni " + anni[0] + (anni.length > 1 ? "–" + anni[anni.length - 1] : "") + ".";
       K.flash = htmlFlash(mov, ab, cv, nFile, nW);
     } catch (e) { K.errore = e.message || String(e); K.flash = null; }
+    if (!K.errore) { avanzSenza("giorni di detenzione, IVACA e quadri"); await new Promise(function (r) { setTimeout(r, 30); }); }
     K.lavoro = false; K.avanzamento = "";
     scegliAnno(); ricalcola(); render();
+    calcoloFine(K.errore);
     if (K.flash && !K.errore) mostraFlash();
   }
   /* primo colpo d'occhio dopo la ricostruzione: che cosa è stato letto, che operazioni ci sono e le giacenze al 31/12 */
@@ -2275,7 +2304,7 @@
     if (t.matches("[data-apri]")) { var k = t.getAttribute("data-apri"); S.aperti[k] = !S.aperti[k]; render(); }
     else if (t.matches("[data-toglisaldi]")) { var dz = t.getAttribute("data-toglisaldi"); S.saldiFile = S.saldiFile.filter(function (z) { return z.data !== dz; }); scegliAnno(); ricalcola(); render(); }
     else if (t.matches("[data-annoivaca]")) { S.anno = +t.getAttribute("data-annoivaca"); S.inclusi = {}; S.valori = {}; ricalcola(); render(); }
-    else if (t.id === "leggiSenza") ricostruisci();
+    else if (t.closest("[data-calcola]")) ricostruisci();
     else if (t.id === "scaricaKraken") scaricaKraken();
     else if (t.id === "salvaKraken") { var fk = S.senza.file.filter(function (f) { return f.api === "kraken"; })[0]; if (fk) scaricaFile(fk.nome, new Blob([fk.testo], { type: "text/csv" })); }
     else if (t.id === "analisiOnchain") analisiOnchain(false);

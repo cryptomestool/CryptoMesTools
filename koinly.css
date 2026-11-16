@@ -136,3 +136,8 @@ dialog.flash{max-width:min(860px,calc(100vw - 32px));max-height:calc(100vh - 48p
 dialog.flash::backdrop{background:rgba(10,20,40,.45)}
 dialog.flash h4{margin:16px 0 6px}
 dialog.flash table.det td.num,dialog.flash table.det th.num{text-align:right;white-space:nowrap}
+/* finestra «Calcolo in corso» */
+dialog.flash.calcolo{max-width:min(440px,calc(100vw - 32px));text-align:center;padding:26px 24px}
+.girella{width:42px;height:42px;margin:0 auto 14px;border:4px solid var(--line,#d8dde6);border-top-color:var(--gold,#b8892b);border-radius:50%;animation:girella .9s linear infinite}
+@keyframes girella{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.girella{animation-duration:2.5s}}
