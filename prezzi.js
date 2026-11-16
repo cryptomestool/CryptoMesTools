@@ -104,15 +104,15 @@
   }
 
   /* giorni per cui servono i prezzi: ogni movimento senza valore in euro e la fine di ogni anno (saldi) */
-  function richieste(mov, anni) {
-    var out = [];
+  function richieste(mov, anni, oggi) {
+    var out = [], adesso = oggi || giorno(Date.now()), entro = function (g) { return g > adesso ? adesso : g; };
     mov.forEach(function (m) {
       var g = giorno(m.ts);
       if (m.controvalore && m.controvalore.valuta && m.controvalore.valuta !== "EUR") out.push({ simbolo: m.controvalore.valuta, giorno: g });
       m.voci.forEach(function (v) { if (!m.valore || (v.lato === "fee" && !m.valoreFee)) out.push({ simbolo: v.simbolo, giorno: g }); });
     });
     var simboli = {}; mov.forEach(function (m) { m.voci.forEach(function (v) { simboli[v.simbolo] = 1; }); });
-    (anni || []).forEach(function (a) { Object.keys(simboli).forEach(function (s) { out.push({ simbolo: s, giorno: (a - 1) + "-12-31" }, { simbolo: s, giorno: a + "-12-31" }); }); });
+    (anni || []).forEach(function (a) { Object.keys(simboli).forEach(function (s) { out.push({ simbolo: s, giorno: entro((a - 1) + "-12-31") }, { simbolo: s, giorno: entro(a + "-12-31") }); }); });
     return out;
   }
 
@@ -147,22 +147,27 @@
   }
 
   /* saldi al 1/1 e al 31/12 di ogni anno ricostruiti dalle transazioni, nel formato dei report Koinly (lettura.js) */
-  function saldiRicostruiti(mov, anni, P) {
-    var out = [];
+  function saldiRicostruiti(mov, anni, P, oggi) {
+    var out = [], adesso = oggi || giorno(Date.now());
+    // prezzo del giorno o, se manca (anno in corso, giorno senza chiusura), dei giorni precedenti fino a una settimana
+    var prezzoEntro = function (s, g) { for (var i = 0; i < 8; i++) { var p = P.prezzo(s, g); if (p) return Object.assign({ giorno: g }, p); g = giorno(ms(g) - GIORNO); } return null; };
     anni.forEach(function (a) {
       [["inizio", Date.UTC(a, 0, 1), (a - 1) + "-12-31", a + "-01-01"], ["fine", Date.UTC(a + 1, 0, 1), a + "-12-31", a + "-12-31"]].forEach(function (x) {
         var q = {};
         mov.forEach(function (m) { if (m.ts < x[1]) m.voci.forEach(function (v) { q[v.simbolo] = (q[v.simbolo] || 0n) + v.q; }); });
+        var futuro = x[2] > adesso, gp = futuro ? adesso : x[2], usato = null;
         var avvisi = [], saldi = Object.keys(q).sort().filter(function (s) { return q[s] > 0n && D.FIAT.indexOf(s) < 0; }).map(function (s) {
-          var p = P.prezzo(s, x[2]), n = D.decNum(q[s]);
-          if (!p) avvisi.push(s + ": prezzo al " + x[2].split("-").reverse().join("/") + " non trovato, valore zero da completare");
+          var p = prezzoEntro(s, gp), n = D.decNum(q[s]); if (p && (!usato || p.giorno < usato)) usato = p.giorno;
+          if (!p) avvisi.push(s + ": prezzo al " + gp.split("-").reverse().join("/") + " non trovato, valore zero da completare");
           return { attivo: s, simbolo: s, tipo: USD_STABLE.indexOf(norm(s)) >= 0 || EUR_STABLE.indexOf(norm(s)) >= 0 ? "stablecoin" : "cripto", quantita: n, quantitaTesto: D.decStr(q[s]), costo: null, valore: p ? n * p.eur : 0, descrizione: p ? p.fonte : "prezzo mancante" };
         });
         var negativi = Object.keys(q).filter(function (s) { return q[s] < 0n && D.FIAT.indexOf(s) < 0; });
         if (negativi.length) avvisi.push("Saldi negativi (mancano movimenti in entrata): " + negativi.join(", ") + ".");
         var tot = saldi.reduce(function (s, z) { return s + z.valore; }, 0);
         out.push({ data: x[3], slot: x[0], r: { fonte: "ricostruito", anno: a, tipoSaldi: x[0], dataSaldi: x[3], annoSolare: true, inizioAnno: x[0] === "inizio", fineAnno: x[0] === "fine",
-          saldi: saldi, valoreCripto: tot, valoreFiat: 0, valoreTotale: tot, avvisi: ["Saldi ricostruiti dalle transazioni, prezzi di chiusura del " + x[2].split("-").reverse().join("/") + " (stimati)."].concat(avvisi), plusvalenze: null, redditi: null } });
+          saldi: saldi, valoreCripto: tot, valoreFiat: 0, valoreTotale: tot, avvisi: [futuro
+            ? "Anno in corso: saldi ricostruiti dalle transazioni fino a oggi, valutati all'ultimo prezzo disponibile (" + (usato || gp).split("-").reverse().join("/") + "). Valore provvisorio, da aggiornare con il prezzo del " + x[2].split("-").reverse().join("/") + "."
+            : "Saldi ricostruiti dalle transazioni, prezzi di chiusura del " + x[2].split("-").reverse().join("/") + " (stimati)."].concat(avvisi), plusvalenze: null, redditi: null, provvisorio: futuro || undefined, dataPrezzi: usato || gp } });
       });
     });
     return out;

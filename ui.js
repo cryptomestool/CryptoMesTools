@@ -121,7 +121,8 @@
     var iniz = {}; ini.r.saldi.forEach(function (s) { if (s.tipo !== "fiat" && s.quantitaTesto != null) iniz[s.simbolo] = s.quantitaTesto; });
     var c = D.calcola(S.tx.dati, a, { fuso: S.fuso, iniziali: iniz });
     c.differenzeFine = D.confronta(c, fin.r.saldi);
-    var iv = I.calcola(c, { quota: Math.min(100, Math.max(0, +S.quota || 0)) / 100, saldiInizio: ini.r.saldi, saldiFine: fin.r.saldi, inclusi: o.inclusi || {}, valori: o.valori || {} });
+    var opIv = { quota: Math.min(100, Math.max(0, +S.quota || 0)) / 100, saldiInizio: ini.r.saldi, saldiFine: fin.r.saldi, inclusi: o.inclusi || {}, valori: o.valori || {} };
+    var iv = conMonitoraggio() ? ivacaPerAmbito(a, opIv) : I.calcola(c, opIv);
     // fino al 2022: giacenza oltre 51.645,69 € per 7 giorni lavorativi continui (regime delle valute)
     var sv = null;
     if (a <= 2022) {
@@ -129,6 +130,48 @@
       sv = D.sogliaValute(c, { saldiInizio: ini.r.saldi, inclusi: o.inclusi || {}, dati: S.tx.dati, cessioni: cs ? cs.cessioni.filter(function (z) { return C.rilevante(z.tipo, a); }) : [] });
     }
     return { calcolo: c, ivaca: iv, soglia: sv };
+  }
+  /* piattaforme «solo monitoraggio» (scelta dello studio): le loro cripto vanno nel quadro RW con la col. 16 barrata e senza IVACA.
+     I wallet privati e le altre piattaforme pagano l'IVACA. Le quantità di ciascun gruppo si ricostruiscono dalle transazioni:
+     di ogni movimento si tiene la parte del gruppo (uscite e commissioni del wallet di partenza, entrate del wallet di arrivo). */
+  S.monitoraggio = {};
+  function conMonitoraggio() { return S.tx && Object.keys(S.monitoraggio).some(function (w) { return S.monitoraggio[w]; }); }
+  function datiAmbito(soloMon) {
+    var mov = [];
+    S.tx.dati.movimenti.forEach(function (t) {
+      var voci = t.voci.filter(function (v) { var w = v.lato === "a" ? t.walletA : t.walletDa; return !!S.monitoraggio[w || ""] === soloMon; });
+      if (voci.length === t.voci.length) mov.push(t); else if (voci.length) mov.push(Object.assign({}, t, { voci: voci }));
+    });
+    return Object.assign({}, S.tx.dati, { movimenti: mov });
+  }
+  function ivacaPerAmbito(a, opIv) {
+    var paga = I.calcola(D.calcola(datiAmbito(false), a, { fuso: S.fuso }), opIv);
+    var mon = I.calcola(D.calcola(datiAmbito(true), a, { fuso: S.fuso }), Object.assign({}, opIv, { inclusi: {}, valori: {}, parametri: { aliquota: 0 } }));
+    mon.righe.forEach(function (r) {
+      r.soloMonitoraggio = true; r.chiave = r.chiave + "|monitoraggio"; r.nome = r.nome + " · solo monitoraggio"; r.ivaca = 0; r.ivacaMedia = 0;
+      r.periodi.forEach(function (p) { p.ivaca = 0; });
+      r.note = ["Su piattaforme «solo monitoraggio»: quadro RW col. 16, senza IVACA."].concat(r.note || []);
+    });
+    paga.righe = paga.righe.concat(mon.righe);
+    paga.totali.righiRw = paga.righe.reduce(function (s, r) { return s + (r.incluso ? r.periodi.length : 0); }, 0);
+    paga.monitoraggio = Object.keys(S.monitoraggio).filter(function (w) { return S.monitoraggio[w]; });
+    return paga;
+  }
+  /* nomi dei wallet e delle piattaforme nei movimenti; privati = letti on-chain (pagano sempre l'IVACA) */
+  function elencoWallet() {
+    if (!S.tx) return [];
+    var n = {}, priv = {};
+    S.senza.righe.forEach(function (w, i) { var l = S.senza.letti[w.id]; if (l && !l.errore) priv[w.nome.trim() || "Wallet " + (i + 1)] = true; });
+    S.tx.dati.movimenti.forEach(function (t) { [t.walletDa, t.walletA].forEach(function (w) { if (w) n[w] = (n[w] || 0) + 1; }); });
+    return Object.keys(n).sort().map(function (w) { var base = w.replace(/ \([^)]*\)$/, ""); return { nome: w, movimenti: n[w], privato: !!(priv[w] || priv[base]) }; });
+  }
+  function pannelloMonitoraggio() {
+    var el = elencoWallet(); if (!el.length) return "";
+    return '<div class="panel" style="margin-top:14px"><h3 style="margin-top:0">IVACA o solo monitoraggio</h3><p class="small">Le cripto sui wallet privati pagano sempre l\'IVACA (2 per mille del valore finale, per i giorni di possesso su 365). Per le piattaforme lo studio indica se il quadro RW è di <b>solo monitoraggio</b>: in quel caso i righi RW hanno la col. 16 barrata e l\'IVACA non si paga. Senza spunta l\'IVACA si paga.</p>' +
+      '<table class="det"><thead><tr><th>Wallet o piattaforma</th><th class="n">Movimenti</th><th>Solo monitoraggio</th></tr></thead><tbody>' +
+      el.map(function (w) { return "<tr><td>" + esc(w.nome) + (w.privato ? ' <span class="small muted">· wallet privato</span>' : "") + '</td><td class="n">' + w.movimenti.toLocaleString("it-IT") + "</td><td>" +
+        (w.privato ? '<span class="small muted">no: paga l\'IVACA</span>' : '<label class="toggle"><input type="checkbox" data-monit="' + esc(w.nome) + '"' + (S.monitoraggio[w.nome] ? " checked" : "") + "><span>solo monitoraggio, niente IVACA</span></label>") + "</td></tr>"; }).join("") +
+      "</tbody></table></div>";
   }
   function ricalcola() {
     calcolo = ivaca = sogliaV = null; S.riepilogoAnni = null; S.sogliaAnni = {};
@@ -457,7 +500,7 @@
       slotKoinlyCes() +
       riquadro("Altri report Koinly", "Facoltativo", "CSV di «Income report», «Expenses report», «Gifts, donations &amp; lost assets» e «Other gains report» (Koinly › Tax reports), anche più file e più anni insieme. Dal 2023 i proventi dell'Income report (staking, reward, airdrop, interessi) entrano nel quadro RT delle cripto; l'Other gains (derivati) si riporta a scelta nel quadro RT al 26% o nel quadro RM. Commissioni, regali e perdite sono informazioni in più. I riepiloghi sono nella scheda «Quadri RW, RT, F24 e sanzioni».",
         '<input type="file" multiple accept=".csv,text/csv" data-kreport>', (S.reportErrore ? '<p class="stato" style="color:var(--hi)">' + esc(S.reportErrore) + "</p>" : "") + (S.report.length ? '<p class="stato">' + S.report.map(function (z) { return "<b>" + esc(z.nome) + "</b> · " + esc(z.r.titolo) + " " + (z.r.anno || "") + " · " + z.r.righe.length.toLocaleString("it-IT") + " righe, " + E(z.r.totale) + ' <button type="button" class="btnlink small" data-toglireport="' + esc(z.chiave) + '">togli</button>'; }).join("<br>") + "</p>" : ""), S.reportErrore, S.report.length) +
-      "</div></div>" + pannelloSenzaKoinly();
+      "</div></div>" + pannelloSenzaKoinly() + pannelloMonitoraggio();
     var et = S.etoro;
     h += '<div class="panel" style="margin-top:14px"><h3 style="margin-top:0">Broker esteri e banche</h3><div class="slots">' +
       riquadro("Rendiconti", "Facoltativo", "Rendiconti dei broker esteri, anche più file insieme. Il rendiconto eToro in PDF («Account statement»: eToro › Portafoglio › Rendiconto del conto, dal primo deposito alla fine dell'ultimo anno) si legge da solo: posizioni chiuse, movimenti, dividendi e portafoglio. Per Trade Republic, Degiro, Interactive Brokers, Revolut e ogni altro broker si compila il modello CSV (si apre con Excel), un file per broker: cessioni, dividendi e interessi, valori delle posizioni e della liquidità, in euro. I quadri RT, RM e RW sono nella scheda «Quadri RW, RT, F24 e sanzioni». Nome, indirizzo e nome utente non vengono conservati.",
@@ -967,11 +1010,11 @@
   };
   function scaricaFile(nome, blob) { var l = document.createElement("a"); l.href = URL.createObjectURL(blob); l.download = nome; document.body.appendChild(l); l.click(); setTimeout(function () { URL.revokeObjectURL(l.href); l.remove(); }, 1000); }
   function salvaLavoro() {
-    var dati = { programma: "CryptoMesTools", versione: 1, salvato: new Date().toISOString(), transazioni: S.tx ? S.tx.nome : "", correzioni: S.correzioni, attribuzioni: S.quest.flag, chiaviWallet: S.quest.chiavi, memoria: S.memoria, cliente: S.quest.cliente, altriRedditi: S.altri, dichiarazioni: S.dich, altreFonti: S.fonti, atti: S.atti, percorso: S.percorso };
+    var dati = { programma: "CryptoMesTools", versione: 1, salvato: new Date().toISOString(), monitoraggio: S.monitoraggio, transazioni: S.tx ? S.tx.nome : "", correzioni: S.correzioni, attribuzioni: S.quest.flag, chiaviWallet: S.quest.chiavi, memoria: S.memoria, cliente: S.quest.cliente, altriRedditi: S.altri, dichiarazioni: S.dich, altreFonti: S.fonti, atti: S.atti, percorso: S.percorso };
     scaricaFile("cryptomestools-lavoro.json", new Blob([JSON.stringify(dati, null, 1)], { type: "application/json" }));
   }
   async function caricaLavoro(f) {
-    try { var j = JSON.parse(await f.text()); S.correzioni = j.correzioni || {}; S.quest.flag = j.attribuzioni || {}; S.quest.chiavi = j.chiaviWallet || {}; if (j.memoria) S.memoria = Object.assign(S.memoria, j.memoria); S.quest.cliente = Object.assign(S.quest.cliente, j.cliente || {}); if (j.percorso && PERCORSI[j.percorso]) scegliPercorsoA(j.percorso); if (j.atti) { S.atti = j.atti; idAtto = S.atti.reduce(function (m, x) { return Math.max(m, x.id + 1); }, idAtto); } if (j.dichiarazioni) { S.dich = j.dichiarazioni; S.fonti = j.altreFonti || []; idProv = S.dich.concat(S.fonti).reduce(function (m, x) { return Math.max(m, x.id + 1); }, idProv); } if (j.altriRedditi) { S.altri = j.altriRedditi; altroId = S.altri.reduce(function (m, x) { return Math.max(m, x.id + 1); }, 1); } S.lavoroCaricato = f.name + (j.transazioni ? " (transazioni: " + j.transazioni + ")" : ""); }
+    try { var j = JSON.parse(await f.text()); S.correzioni = j.correzioni || {}; S.monitoraggio = j.monitoraggio || {}; S.quest.flag = j.attribuzioni || {}; S.quest.chiavi = j.chiaviWallet || {}; if (j.memoria) S.memoria = Object.assign(S.memoria, j.memoria); S.quest.cliente = Object.assign(S.quest.cliente, j.cliente || {}); if (j.percorso && PERCORSI[j.percorso]) scegliPercorsoA(j.percorso); if (j.atti) { S.atti = j.atti; idAtto = S.atti.reduce(function (m, x) { return Math.max(m, x.id + 1); }, idAtto); } if (j.dichiarazioni) { S.dich = j.dichiarazioni; S.fonti = j.altreFonti || []; idProv = S.dich.concat(S.fonti).reduce(function (m, x) { return Math.max(m, x.id + 1); }, idProv); } if (j.altriRedditi) { S.altri = j.altriRedditi; altroId = S.altri.reduce(function (m, x) { return Math.max(m, x.id + 1); }, 1); } S.lavoroCaricato = f.name + (j.transazioni ? " (transazioni: " + j.transazioni + ")" : ""); }
     catch (e) { S.lavoroCaricato = "File non valido: " + e.message; }
     render();
   }
@@ -1589,6 +1632,7 @@
         '<label class="f"><span class="t">Rigo unico per le cripto con più di … periodi</span><input class="num" type="number" min="0" step="1" data-mod="sogliaPeriodi" value="' + esc(S.modelli.sogliaPeriodi) + '"><span class="small">Valore iniziale del primo periodo, valore medio ponderato per i giorni, giorni complessivi: l\'imposta resta uguale alla somma dei periodi. 0 = mai.</span></label><label class="f"><span class="t">Col. 1 · titolo di possesso</span><select data-mod="titolo">' + [1, 2, 3, 4].map(function (k) { return '<option value="' + k + '"' + (S.modelli.titolo === k ? " selected" : "") + ">" + k + " · " + TITOLI[k] + "</option>"; }).join("") + "</select></label>" +
         '<div class="f"><span class="t">Anno ' + q.anno + '</span><span class="small">' + q.righi.length + " righi in " + q.moduli + " moduli: un rigo per periodo di detenzione. Codice " + q.codice + (q.codice === 14 ? " (cripto-attività, fino al 2022: solo monitoraggio, senza imposta)" : " (cripto-attività)") + ", criterio 1 (valore di mercato), quota " + String(ivaca.quota * 100).replace(".", ",") + "%.</span></div></div>" +
         '<p class="small">La circolare 30/E chiede un rigo per ogni portafoglio: qui i periodi sono calcolati sul totale dei wallet di ciascuna cripto.</p>' +
+        (function () { var z = saldiFineAnno(q.anno); return z && z.r && z.r.provvisorio ? '<p class="small" style="color:var(--hi)"><b>Anno in corso:</b> il valore finale dei periodi che arrivano al 31/12/' + q.anno + " è all\'ultimo prezzo disponibile (" + D.it(z.r.dataPrezzi) + "): IVACA provvisoria, da ricalcolare con il prezzo del 31 dicembre.</p>" : ""; })() +
         '<div class="scroll">' + tabellaRW(q) + "</div></div>";
     }
     // quadro RT: dagli anni della pagina Sanzioni (corrispettivi e costi)
@@ -2166,6 +2210,10 @@
     if (t.matches("[data-prov]")) { var dv = S.dich.filter(function (x) { return x.id === +t.getAttribute("data-prov"); })[0], dk = t.getAttribute("data-k"); if (dv) { dv[dk] = dk === "tipo" ? t.value : t.value === "" ? "" : +t.value; if (dk === "anno") { dv.daVerificare = false; S.dich.sort(function (a, b) { return (a.anno || 0) - (b.anno || 0); }); } } render(); return; }
     if (t.matches("[data-fonte]")) { var fv = S.fonti.filter(function (x) { return x.id === +t.getAttribute("data-fonte"); })[0], fk = t.getAttribute("data-k"); if (fv) fv[fk] = fk === "descrizione" ? t.value : t.value === "" ? "" : +t.value; render(); return; }
     if (t.matches("[data-zprov]")) { var zp = S.sanz.anni.filter(function (x) { return x.id === +t.getAttribute("data-zprov"); })[0]; if (zp) zp.proventi = t.checked; render(); return; }
+    if (t.matches("[data-monit]")) {
+      S.monitoraggio[t.getAttribute("data-monit")] = t.checked; ricalcola();
+      // l'IVACA calcolata già riportata negli anni dei quadri si aggiorna
+      S.sanz.anni.forEach(function (x) { if (x.anno >= 2023 && x.fonte && x.fonte.ivaca === "calcolo") { var c = calcolaAnno(x.anno); if (c) x.ivaca = Math.round(c.ivaca.totali.ivaca * 100) / 100; } }); var y = window.scrollY; render(); window.scrollTo(0, y); return; }
     if (t.matches("[data-za]")) {
       var za = S.sanz.anni.filter(function (x) { return x.id === +t.getAttribute("data-za"); })[0], zk = t.getAttribute("data-k");
       var testo = ["stato", "fonteRT", "controlli", "invio"].indexOf(zk) >= 0;

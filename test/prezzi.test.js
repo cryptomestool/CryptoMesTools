@@ -72,6 +72,15 @@ const mov = [
     assert.ok(fin.r.saldi.every((x) => x.simbolo !== "USD"));
     assert.ok(fin.r.avvisi.some((a) => /XYZ: prezzo/.test(a)));
   });
+  t("anno in corso: saldi al 31/12 futuro valutati all'ultimo prezzo disponibile, segnalati come provvisori", () => {
+    const s = Z.saldiRicostruiti(mov, [2020], P, "2020-01-04");
+    const fin = s[1].r, btc = fin.saldi.filter((x) => x.simbolo === "BTC")[0];
+    assert.equal(fin.provvisorio, true); assert.equal(fin.dataPrezzi, "2020-01-03");
+    assert.equal(btc.valore, 0.05 * 6600);
+    assert.ok(/Anno in corso/.test(fin.avvisi[0]));
+    const r = Z.richieste(mov, [2020], "2020-01-04");
+    assert.ok(r.every((x) => x.giorno <= "2020-01-04"));
+  });
   // sinonimi e nome precedente: WETH vale ETH; POL prima del 2024 usa la serie MATIC
   const json2 = (url) => {
     if (url.indexOf("frankfurter") >= 0) return Promise.resolve({ rates: { "2023-06-01": { USD: 1.25 }, "2024-10-01": { USD: 1.25 } } });
