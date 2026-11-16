@@ -394,7 +394,7 @@
       for (var k = 0; k < tentativi; k++) {
         var adesso = Date.now(); if (adesso - ultimo < pausa) await dormi(pausa - (adesso - ultimo)); ultimo = Date.now();
         var r;
-        try { r = await f(url); } catch (e) { if (opz.avviso) opz.avviso("rete non raggiungibile, nuovo tentativo"); await dormi(attesa * (k + 1)); continue; }
+        try { r = await f(url); } catch (e) { if (opz.avviso) opz.avviso("rete non raggiungibile o troppe richieste, nuovo tentativo tra " + Math.round(attesa * (k + 1) / 1000) + " secondi"); await dormi(attesa * (k + 1)); continue; }
         if (r.status === 429 || r.status >= 500) { if (opz.avviso) opz.avviso("il servizio chiede di rallentare (" + r.status + "), attesa di " + Math.round(attesa * (k + 1) / 1000) + " secondi"); await dormi(attesa * (k + 1)); continue; }
         if (!r.ok) throw new Error("Risposta " + r.status + " da " + url.split("?")[0]);
         return r.json();

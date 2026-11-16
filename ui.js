@@ -2,14 +2,14 @@
 /* Koinly Tools · interfaccia. I file caricati restano nel browser: non vengono salvati né inviati in rete. */
 (function () {
   "use strict";
-  var L = window.KoinlyLettura, D = window.KoinlyDetenzione, I = window.KoinlyIvaca, Z = window.KoinlySanzioni, MOD = window.KoinlyModelli, C = window.KoinlyCosti, QZ = window.KoinlyQuestionario, BK = window.KoinlyBanca, ET = window.KoinlyEtoro, KX = window.KoinlyEstero, PV = window.KoinlyProvenienza, PR = window.KoinlyPratica, KR = window.KoinlyReport;
+  var L = window.KoinlyLettura, D = window.KoinlyDetenzione, I = window.KoinlyIvaca, Z = window.KoinlySanzioni, MOD = window.KoinlyModelli, C = window.KoinlyCosti, QZ = window.KoinlyQuestionario, BK = window.KoinlyBanca, ET = window.KoinlyEtoro, KX = window.KoinlyEstero, PV = window.KoinlyProvenienza, PR = window.KoinlyPratica, KR = window.KoinlyReport, PT = window.KoinlyPiattaforme, OC = window.KoinlyOnchain, PZ = window.KoinlyPrezzi;
   if (window.pdfjsLib) window.pdfjsLib.GlobalWorkerOptions.workerSrc = "comune/vendor/pdf.worker.min.js";
   var app = document.getElementById("app");
 
   // ordine delle schede scelto dallo studio, numerate da 0
   var TABS = ["Guida", "Caricamento file", "Costi di carico (LIFO)", "Giorni di detenzione, IVACA e IVAFE", "Quadri RW, RT e F24", "Sanzioni RW, RT e RM", "Questionario AdE", "Pratica AdE", "Fascicolo finale: stampa"];
   var VISTE = ["guida", "caricamento", "costi", "ivaca", "modelli", "sanzioni", "questionario", "pratica", "riepilogo"];
-  var S = { tab: 1, tx: null, inizio: null, fine: null, anno: null, fuso: "UTC", quota: 100, inclusi: {}, valori: {}, aperti: {}, spamAperti: false, errore: {}, saldiFile: [], report: [] };
+  var S = { tab: 1, tx: null, inizio: null, fine: null, anno: null, fuso: "UTC", quota: 100, inclusi: {}, valori: {}, aperti: {}, spamAperti: false, errore: {}, saldiFile: [], report: [], senza: { file: [], chiavi: "", avvisi: [], wallet: [] } };
   var calcolo = null, ivaca = null, sogliaV = null;
 
   /* ---------- formattazione ---------- */
@@ -42,6 +42,7 @@
           var dati = D.leggiTransazioni(await f.text());
           if (dati.errore) throw new Error(dati.errore);
           S.tx = { nome: f.name, dati: dati };
+          S.saldiFile = S.saldiFile.filter(function (z) { return !z.ricostruito; });
         } else {
           var r = pdf ? L.leggiPdf(await testoPdf(f)) : L.leggiCsv(await f.text());
           if (r.errore) throw new Error(r.errore);
@@ -214,11 +215,110 @@
   function riquadro(titolo, obbl, testo, campo, stato, err, ok) {
     return '<div class="slot' + (err ? " err" : ok ? " ok" : "") + '"><span class="req">' + obbl + "</span><h3>" + titolo + '</h3><p class="small muted" style="margin:0">' + testo + "</p>" + campo + (stato || "") + "</div>";
   }
+  /* ---------- senza Koinly: file delle piattaforme, wallet Bitcoin dalla blockchain, prezzi e saldi ricostruiti ---------- */
+  function pannelloSenzaKoinly() {
+    var K = S.senza, daPiatt = S.tx && S.tx.fonte === "piattaforme";
+    var esiti = (K.esiti || []).map(function (e) {
+      return "<li><b>" + esc(e.nome || "") + "</b>" + (e.errore ? ' · <span style="color:var(--hi)">' + esc(e.errore) + "</span>" : " · " + esc(e.piattaforma || "") + (e.movimenti ? " · " + e.movimenti.length.toLocaleString("it-IT") + " movimenti" : "")) +
+        ((e.avvisi || []).length ? '<br><span class="small" style="color:var(--mid)">' + e.avvisi.map(esc).join("<br>") + "</span>" : "") + "</li>";
+    }).concat(K.wallet.map(function (w) { return "<li><b>" + esc(w.nome) + "</b> · blockchain Bitcoin · " + w.indirizzi + " indirizzi usati · " + w.movimenti + " movimenti</li>"; })).join("");
+    var stato = (K.avanzamento ? '<p class="stato" id="avanzSenza">' + esc(K.avanzamento) + "…</p>" : '<p class="stato" id="avanzSenza" hidden></p>') +
+      (K.errore ? '<p class="stato" style="color:var(--hi)">' + esc(K.errore) + "</p>" : "") +
+      (K.riepilogo && daPiatt ? '<p class="stato"><b>Transazioni ricostruite senza Koinly</b>: ' + esc(K.riepilogo) + "</p>" : "") +
+      (esiti ? '<ul class="small" style="margin:6px 0 0;padding-left:18px">' + esiti + "</ul>" : "") +
+      (K.avvisi.length ? '<p class="small" style="color:var(--mid)">' + K.avvisi.map(esc).join("<br>") + "</p>" : "");
+    return '<div class="panel" style="margin-top:14px"><h3 style="margin-top:0">Senza Koinly: piattaforme e blockchain</h3><p class="small">In alternativa al file delle transazioni di Koinly. Le transazioni si ricostruiscono dai CSV esportati dalle piattaforme e, per i wallet Bitcoin, dalla blockchain. I trasferimenti tra wallet del cliente si abbinano da soli, per hash o per importo. I prezzi in euro mancanti sono quelli di chiusura del giorno su Binance, in euro o in USDT al cambio BCE. I saldi al 1/1 e al 31/12 si ricostruiscono dalle transazioni. Tutti questi valori sono stimati: verificateli e correggeteli nella scheda «Costi di carico». Se caricate i report dei saldi Koinly, valgono quelli.</p><div class="slots">' +
+      riquadro("File delle piattaforme", "Facoltativo", "CSV di Binance (Transaction History, con la Deposit e Withdraw History e il report fiscale), Coinbase e Coinbase Pro, Nexo, Young Platform, Revolut (sezione Cripto e Revolut X), Relai, Ledger Live, BitBoxApp ed Etherscan. Anche più file e più anni insieme: le righe ripetute contano una volta.",
+        '<input type="file" multiple accept=".csv,text/csv" data-piatt>', K.file.length ? '<p class="stato">' + K.file.map(function (f, i) { return "<b>" + esc(f.nome) + '</b> <button type="button" class="btnlink small" data-toglipiatt="' + i + '">togli</button>'; }).join("<br>") + "</p>" : "", false, K.file.length) +
+      riquadro("Wallet Bitcoin", "Facoltativo", "Una riga per wallet: nome del wallet, poi la chiave pubblica estesa (xpub, ypub o zpub; per Taproot aggiungete «Taproot») oppure uno o più indirizzi, separati da punto e virgola. Es. «Ledger; zpub6r…». Gli indirizzi si ricavano dalla chiave in questo browser: a mempool.space arrivano solo gli indirizzi, uno alla volta (circa uno al secondo).",
+        '<textarea data-senzachiavi rows="3" style="width:100%;font-family:var(--mono,monospace);font-size:12px" placeholder="Ledger; zpub6r…&#10;Relai; bc1q…">' + esc(K.chiavi) + "</textarea>", "", false, !!K.chiavi.trim()) +
+      "</div>" + '<div class="toolbar" style="margin-top:10px"><button type="button" class="btn gold" id="leggiSenza"' + (K.lavoro ? " disabled" : "") + ">" + (K.lavoro ? "Lettura in corso…" : "Ricostruisci le transazioni") + "</button>" +
+      (daPiatt ? ' <span class="small">Sostituiscono il file Koinly delle transazioni.</span>' : "") + "</div>" + stato + "</div>";
+  }
+  function avanzSenza(t) {
+    S.senza.avanzamento = t;
+    var el = document.getElementById("avanzSenza"); if (el) { el.hidden = false; el.textContent = t + "…"; }
+  }
+  /* righe «nome; chiave o indirizzi; tipo» → [{ nome, chiave, tipo, indirizzi }] */
+  function elencoWallet(testo) {
+    return String(testo || "").split(/\r?\n/).map(function (r, i) {
+      var c = r.split(/[;,\t]/).map(function (x) { return x.trim(); }).filter(Boolean); if (!c.length) return null;
+      var chiave = c.filter(function (x) { return /^[xyzXYZt]pub[1-9A-HJ-NP-Za-km-z]{100,}$/.test(x); })[0];
+      var indirizzi = c.filter(function (x) { return /^(bc1[02-9ac-hj-np-z]{25,90}|[13][1-9A-HJ-NP-Za-km-z]{25,34})$/.test(x); });
+      // il primo campo che non è chiave né indirizzo è il nome (anche se contiene «segwit» o «BIP84»); il tipo è un campo successivo
+      var altri = c.filter(function (x) { return x !== chiave && indirizzi.indexOf(x) < 0; });
+      var nome = altri[0] || "Wallet " + (i + 1);
+      var tipo = altri.slice(1).filter(function (x) { return /taproot|bip86|legacy|bip44|bip49|bip84|segwit/i.test(x); })[0] || "";
+      return chiave || indirizzi.length ? { nome: nome, chiave: chiave || "", tipo: tipo, indirizzi: indirizzi } : null;
+    }).filter(Boolean);
+  }
+  async function jsonPrezzi(u) {
+    var r = await fetch(u);
+    if (r.status === 400) return null; // coppia inesistente su Binance
+    if (!r.ok) throw new Error("Il servizio dei prezzi risponde " + r.status + ": riprovare più tardi.");
+    return r.json();
+  }
+  async function leggiSenzaKoinly() {
+    var K = S.senza; if (K.lavoro) return;
+    K.lavoro = true; K.errore = null; K.avvisi = []; K.wallet = []; K.esiti = null; K.riepilogo = "";
+    avanzSenza("lettura dei file"); render();
+    try {
+      var r = K.file.length ? PT.leggiFile(K.file) : { file: [], movimenti: [], scambiApp: [] };
+      K.esiti = r.file;
+      var mov = r.movimenti.slice();
+      // wallet: dalla casella e dai file con l'elenco delle chiavi
+      var righe = elencoWallet(K.chiavi);
+      K.file.forEach(function (f) { if (PT.riconosci(f.testo, f.nome) === "chiavi") OC.leggiElencoChiavi(f.testo).forEach(function (x) { righe.push({ nome: x.wallet, chiave: x.chiave, tipo: x.tipo, indirizzi: [] }); }); });
+      var json = OC.creaRichiesta({ avviso: function (t) { avanzSenza("mempool.space: " + t); } });
+      var uk = OC.chiaviUniche(righe.filter(function (x) { return x.chiave; }).map(function (x) { return { wallet: x.nome, tipo: x.tipo, chiave: x.chiave }; }));
+      uk.scartate.forEach(function (x) { K.avvisi.push(x.errore ? "«" + x.wallet + "»: " + x.errore : "«" + x.wallet + "»: stessa chiave di «" + x.ugualeA + "», letta una volta."); });
+      for (var i = 0; i < uk.chiavi.length; i++) {
+        var w = uk.chiavi[i];
+        var lw = await OC.leggiWallet(w.chiave, w.tipo, { json: json, avanzamento: function (a, c, j) { avanzSenza("wallet «" + w.wallet + "»: indirizzo " + (c ? "di resto" : "di ricezione") + " n. " + (j + 1)); } });
+        var mw = OC.movimenti(lw.transazioni, lw.indirizzi, w.wallet); mov = mov.concat(mw);
+        K.wallet.push({ nome: w.wallet, indirizzi: lw.usati.length, movimenti: mw.length });
+      }
+      var conInd = righe.filter(function (x) { return !x.chiave && x.indirizzi.length; });
+      for (var k = 0; k < conInd.length; k++) {
+        var wi = conInd[k];
+        var li = await OC.leggiIndirizzi(wi.indirizzi, { json: json, avanzamento: function (a, c, j) { avanzSenza("wallet «" + wi.nome + "»: indirizzo n. " + (j + 1)); } });
+        var mi = OC.movimenti(li.transazioni, li.indirizzi, wi.nome); mov = mov.concat(mi);
+        K.wallet.push({ nome: wi.nome, indirizzi: li.usati.length, movimenti: mi.length });
+      }
+      if (r.scambiApp && r.scambiApp.length) { var sa = PT.applicaScambi(mov, r.scambiApp); mov = sa.movimenti; if (sa.mancanti.length) K.avvisi.push(sa.mancanti.length + " scambi delle app dei wallet senza i movimenti on-chain corrispondenti."); }
+      var ab = PT.abbinaTrasferimenti(mov); mov = ab.movimenti;
+      if (!mov.length) throw new Error("Nessun movimento letto: caricate i CSV delle piattaforme o indicate almeno un wallet.");
+      mov.sort(function (a, b) { return a.ts - b.ts; });
+      mov.forEach(function (m, j) { m.riga = j + 1; });
+      // prezzi e saldi: dall'anno del primo movimento all'ultimo anno chiuso
+      var oggi = new Date().getUTCFullYear(), primo = new Date(mov[0].ts).getUTCFullYear(), anni = [];
+      for (var a = primo; a <= Math.max(primo, oggi - 1); a++) anni.push(a);
+      var P = PZ.crea({ json: jsonPrezzi, avanzamento: function (t) { avanzSenza("prezzi: " + t); } });
+      await P.prepara(PZ.richieste(mov, anni));
+      var cv = PZ.completaValori(mov, P);
+      if (P.mancanti().length) K.avvisi.push("Cripto senza prezzo su Binance (valore da inserire a mano): " + P.mancanti().join(", ") + ".");
+      S.saldiFile = S.saldiFile.filter(function (z) { return !z.ricostruito; });
+      PZ.saldiRicostruiti(mov, anni, P).forEach(function (z) {
+        if (S.saldiFile.some(function (y) { return y.data === z.data; })) return; // il report Koinly della stessa data prevale
+        z.nome = "Saldi ricostruiti dalle transazioni"; z.ricostruito = true; S.saldiFile.push(z);
+      });
+      S.saldiFile.sort(function (x, y) { return x.data < y.data ? -1 : 1; });
+      var nFile = r.file.filter(function (e) { return !e.errore; }).length;
+      S.tx = { nome: "Piattaforme e blockchain (" + nFile + " file, " + K.wallet.length + " wallet)", fonte: "piattaforme",
+        dati: { formato: "piattaforme", numeri: "en", fuso: "UTC", movimenti: mov, righe: mov.length, cancellate: 0, senzaData: 0, senzaImporti: 0 } };
+      S.errore.tx = null;
+      K.riepilogo = mov.length.toLocaleString("it-IT") + " movimenti dal " + it(PZ.giorno(mov[0].ts)) + " al " + it(PZ.giorno(mov[mov.length - 1].ts)) + "; " +
+        (ab.perHash + ab.perImporto) + " trasferimenti tra wallet abbinati" + (ab.doppi ? ", " + ab.doppi + " doppioni tolti" : "") + "; " + cv.stimati.toLocaleString("it-IT") + " valori in euro stimati" +
+        (cv.senzaValore ? ", " + cv.senzaValore + " senza prezzo" : "") + "; saldi ricostruiti per gli anni " + anni[0] + (anni.length > 1 ? "–" + anni[anni.length - 1] : "") + ".";
+    } catch (e) { K.errore = e.message || String(e); }
+    K.lavoro = false; K.avanzamento = "";
+    scegliAnno(); ricalcola(); render();
+  }
   function viewCaricamento() {
     var B = S.banca;
     var h = scegliPercorso() + '<h2>Caricamento file</h2><p class="lead">Qui si caricano tutti i file della pratica. Per ciascuno è indicato che cosa contiene, dove si scarica e in quale scheda si usa. Le transazioni e i saldi di Koinly sono indispensabili; gli altri file aggiungono riscontri e quadri.</p>' +
       '<div class="banner beta-avviso"><strong>Versione beta</strong><p>Koinly Tools è in fase di test: i risultati vanno verificati con lo studio prima di usarli per la dichiarazione o per qualsiasi versamento. Segnalazioni e suggerimenti sono benvenuti.</p></div>' +
-      '<div class="banner"><strong>Riservatezza</strong><p>I file restano in questo browser: non vengono salvati né inviati in rete. Non sapete quali file caricare? <button type="button" class="btnlink" data-tab="0">Leggete la guida</button>.</p></div>';
+      '<div class="banner"><strong>Riservatezza</strong><p>I file restano in questo browser: non vengono salvati né inviati in rete (con la lettura senza Koinly partono soltanto i simboli delle cripto con le date, per i prezzi, e gli indirizzi dei wallet Bitcoin, per leggerne i movimenti). Non sapete quali file caricare? <button type="button" class="btnlink" data-tab="0">Leggete la guida</button>.</p></div>';
     h += '<div class="panel"><h3 style="margin-top:0">Koinly</h3><div class="slots">' +
       slot("tx", "Transazioni", true, "CSV con tutte le transazioni di tutti gli anni, dal primo acquisto: «backup_transactions_koinly.csv» (Koinly › Transactions › esporta) oppure «transaction history». Serve a tutte le schede: periodi di detenzione, costi di carico, questionario.", ".csv,text/csv") +
       slot("inizio", "Saldi a inizio anno", true, "«Beginning of year holdings» in CSV (Koinly › Tax reports), uno per ogni anno da esaminare, anche più file insieme. Quantità e valori al 1° gennaio; il report di fine dell'anno precedente vale come saldo iniziale. Serve ai giorni di detenzione e all'IVACA (fino a 5 anni prima dell'ultimo) e dà i prezzi Koinly al questionario dell'Agenzia, per tutti gli anni richiesti.", ".csv,.pdf") +
@@ -226,7 +326,7 @@
       slotKoinlyCes() +
       riquadro("Altri report Koinly", "Facoltativo", "CSV di «Income report», «Expenses report», «Gifts, donations &amp; lost assets» e «Other gains report» (Koinly › Tax reports), anche più file e più anni insieme. Dal 2023 i proventi dell'Income report (staking, reward, airdrop, interessi) entrano nel quadro RT delle cripto; l'Other gains (derivati) si riporta a scelta nel quadro RT al 26% o nel quadro RM. Commissioni, regali e perdite sono informazioni in più. I riepiloghi sono nella scheda «Quadri RW, RT e F24».",
         '<input type="file" multiple accept=".csv,text/csv" data-kreport>', (S.reportErrore ? '<p class="stato" style="color:var(--hi)">' + esc(S.reportErrore) + "</p>" : "") + (S.report.length ? '<p class="stato">' + S.report.map(function (z) { return "<b>" + esc(z.nome) + "</b> · " + esc(z.r.titolo) + " " + (z.r.anno || "") + " · " + z.r.righe.length.toLocaleString("it-IT") + " righe, " + E(z.r.totale) + ' <button type="button" class="btnlink small" data-toglireport="' + esc(z.chiave) + '">togli</button>'; }).join("<br>") + "</p>" : ""), S.reportErrore, S.report.length) +
-      "</div></div>";
+      "</div></div>" + pannelloSenzaKoinly();
     var et = S.etoro;
     h += '<div class="panel" style="margin-top:14px"><h3 style="margin-top:0">Broker esteri e banche</h3><div class="slots">' +
       riquadro("Rendiconti", "Facoltativo", "Rendiconti dei broker esteri, anche più file insieme. Il rendiconto eToro in PDF («Account statement»: eToro › Portafoglio › Rendiconto del conto, dal primo deposito alla fine dell'ultimo anno) si legge da solo: posizioni chiuse, movimenti, dividendi e portafoglio. Per Trade Republic, Degiro, Interactive Brokers, Revolut e ogni altro broker si compila il modello CSV (si apre con Excel), un file per broker: cessioni, dividendi e interessi, valori delle posizioni e della liquidità, in euro. I quadri RT, RM e RW sono nella scheda «Quadri RW, RT e F24». Nome, indirizzo e nome utente non vengono conservati.",
@@ -1824,6 +1924,8 @@
     if (t.matches("[data-cf]")) { var cf = t.getAttribute("data-cf"); S.costi.filtro[cf] = t.type === "checkbox" ? t.checked : t.value; render(); return; }
     if (t.matches("[data-cs]")) { var cs = t.getAttribute("data-cs"); S.costi[cs] = cs === "anno" ? +t.value : cs === "swapNeutri" ? t.value === "si" : t.value; render(); return; }
     if (t.matches("[data-lavoro]") && t.files[0]) { caricaLavoro(t.files[0]); return; }
+    if (t.matches("[data-piatt]") && t.files.length) { var fp = Array.prototype.slice.call(t.files); Promise.all(fp.map(function (f) { return f.text(); })).then(function (tx) { fp.forEach(function (f, i) { S.senza.file = S.senza.file.filter(function (x) { return x.nome !== f.name; }); S.senza.file.push({ nome: f.name, testo: tx[i] }); }); render(); }); return; }
+    if (t.matches("[data-senzachiavi]")) { S.senza.chiavi = t.value; return; }
     if (t.matches("[data-banca]") && t.files.length) { caricaBanca(t.files); return; }
     if (t.matches("[data-koinlyces]") && t.files[0]) { caricaKoinlyCes(t.files[0]); return; }
     // rendiconti: il PDF è il rendiconto eToro, i CSV sono modelli compilati degli altri broker
@@ -1866,7 +1968,9 @@
     if (t.matches("[data-apri]")) { var k = t.getAttribute("data-apri"); S.aperti[k] = !S.aperti[k]; render(); }
     else if (t.matches("[data-toglisaldi]")) { var dz = t.getAttribute("data-toglisaldi"); S.saldiFile = S.saldiFile.filter(function (z) { return z.data !== dz; }); scegliAnno(); ricalcola(); render(); }
     else if (t.matches("[data-annoivaca]")) { S.anno = +t.getAttribute("data-annoivaca"); S.inclusi = {}; S.valori = {}; ricalcola(); render(); }
-    else if (t.matches("[data-togli]")) { var s = t.getAttribute("data-togli"); S[s] = null; S.errore[s] = null; if (s === "tx") S.anno = null; scegliAnno(); ricalcola(); render(); }
+    else if (t.id === "leggiSenza") { var ta = app.querySelector("[data-senzachiavi]"); if (ta) S.senza.chiavi = ta.value; leggiSenzaKoinly(); }
+    else if (t.matches("[data-toglipiatt]")) { S.senza.file.splice(+t.getAttribute("data-toglipiatt"), 1); render(); }
+    else if (t.matches("[data-togli]")) { var s = t.getAttribute("data-togli"); S[s] = null; S.errore[s] = null; if (s === "tx") { S.anno = null; S.saldiFile = S.saldiFile.filter(function (z) { return !z.ricostruito; }); } scegliAnno(); ricalcola(); render(); }
     else if (t.id === "excel") excel();
     else if (t.id === "stampa") stampa();
     else if (t.id === "aggiungiAnno") { nuovoAnno(); render(); }

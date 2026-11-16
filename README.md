@@ -30,6 +30,16 @@ Criteri (regole dello studio):
 
 Uscite: tabella a video con i periodi; Excel (fogli «Righi RW» e «Riepilogo per cripto», A4 orizzontale, imposta a formula); resoconto da stampare o salvare in PDF con tutti i periodi.
 
+## 1-bis. Senza Koinly: piattaforme e blockchain
+
+Nel riquadro «Senza Koinly» della scheda di caricamento le transazioni si ricostruiscono senza il file di Koinly, che sostituiscono:
+
+- **CSV delle piattaforme** (`piattaforme.js`): Binance (Transaction History, con Deposit e Withdraw History per indirizzi e hash e il report fiscale per i valori in euro), Coinbase e Coinbase Pro, Nexo, Young Platform, Revolut (sezione Cripto e Revolut X), Relai, Ledger Live, BitBoxApp, Etherscan. Più file della stessa piattaforma si uniscono e le righe ripetute contano una volta.
+- **Wallet Bitcoin dalla blockchain** (`onchain.js`): una riga per wallet, «nome; chiave pubblica estesa» (xpub, ypub, zpub; «Taproot» per BIP86) oppure «nome; indirizzi». Gli indirizzi si ricavano dalla chiave nel browser; a mempool.space arrivano solo gli indirizzi, uno al secondo circa, con attese crescenti se il servizio rallenta.
+- **Trasferimenti tra wallet del cliente**: abbinati per hash della transazione o, senza hash, per cripto, quantità (fino all'1% in meno per la commissione di rete) e data entro 48 ore.
+- **Prezzi in euro** (`prezzi.js`): dove il file non dà l'euro, prezzo di chiusura giornaliero (UTC) della coppia Binance in euro, o in USDT convertito al cambio BCE (api.frankfurter.dev); controvalori in dollari e stablecoin al cambio BCE del giorno. Ai servizi arrivano solo simboli e date. I valori sono stimati: si correggono nella scheda dei costi; le cripto senza prezzo sono elencate.
+- **Saldi al 1/1 e al 31/12** ricostruiti dalle transazioni per ogni anno, dal primo movimento all'ultimo anno chiuso, valutati con gli stessi prezzi. Se si caricano i report dei saldi Koinly, quelli della stessa data prevalgono.
+
 ## 2. Costi di carico (LIFO globale)
 
 - **Partenza:** costi ricostruiti dall'origine, dalla prima transazione Koinly, non dai saldi di inizio anno.
@@ -158,6 +168,9 @@ Scheda «Guida» per il cliente (`guida.js`): quali file Koinly scaricare, come 
 | File | Contenuto |
 |---|---|
 | `index.html`, `ui.js`, `koinly.css` | Pagina e interfaccia |
+| `piattaforme.js` | Lettura diretta dei CSV delle piattaforme e abbinamento dei trasferimenti tra wallet |
+| `onchain.js` | Wallet Bitcoin dalla blockchain: indirizzi dalla chiave pubblica estesa, transazioni da mempool.space |
+| `prezzi.js` | Prezzi in euro mancanti (Binance e cambio BCE) e saldi di inizio e fine anno ricostruiti |
 | `lettura.js` | Lettura dei report di saldi Koinly (CSV e PDF, italiano e inglese) |
 | `detenzione.js` | Transazioni, giorni di detenzione, periodi, token sospetti, riscontri |
 | `ivaca.js` | Valori dei periodi e imposta |
