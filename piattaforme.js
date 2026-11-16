@@ -947,6 +947,8 @@
   }
 
   /* lettori per tipo: colonne dell'intestazione e chiave che identifica la riga tra file diversi */
+  /* Kraken: la stessa riga del ledger dal CSV e dall'API (o da due export che si sovrappongono) ha stesso refid, asset, importo e
+     commissione; la chiave non usa il txid (assente negli export più vecchi) né l'orario (con o senza decimali dei secondi) */
   var tutte = function (x) { return Object.keys(x).filter(function (k) { return k !== "_riga" && k !== "balance" && k !== "Saldo"; }).sort().map(function (k) { return k + "=" + x[k]; }).join("|"); };
   var LETTORI = {
     "coinbase": { leggi: function (t) { return leggiCoinbase(t); }, colonne: ["Timestamp", "Transaction Type", "Asset", "Quantity Transacted"], chiave: function (x) { return x.ID ? "id=" + x.ID : tutte(x); } },
@@ -955,7 +957,7 @@
     "young": { leggi: function (t) { return leggiYoung(t); }, colonne: ["credit", "debit", "currency", "date", "tx_type"], chiave: function (x) { return x.id ? "id=" + x.id : tutte(x); } },
     "revolut": { leggi: function (t) { return leggiRevolut(t); }, colonne: ["Symbol", "Type", "Quantity", "Price", "Value", "Fees", "Date"], chiave: tutte },
     "relai": { leggi: function (t) { return leggiRelai(t); }, colonne: ["Date", "Transaction Type", "BTC Amount", "Fiat Amount (excl. fees)", "Destination"], chiave: function (x) { return x["Operation ID"] ? "id=" + x["Operation ID"] : tutte(x); } },
-    "kraken": { leggi: function (t) { return leggiKraken(t); }, colonne: ["refid", "time", "type", "asset", "amount", "fee"], chiave: function (x) { return x.txid ? "id=" + x.txid : tutte(x); } },
+    "kraken": { leggi: function (t) { return leggiKraken(t); }, colonne: ["refid", "time", "type", "asset", "amount", "fee"], chiave: function (x) { return [x.refid, String(x.asset || "").trim().toUpperCase(), D.decStr(q(x.amount)), D.decStr(q(x.fee))].join("|"); } },
     "ledger": { leggi: function (t) { return leggiLedger(t); }, colonne: ["Operation Date", "Currency Ticker", "Operation Type", "Operation Amount"], chiave: function (x) { return [x["Operation Date"], x["Currency Ticker"], x["Operation Type"], x["Operation Amount"], x["Operation Hash"], x["Account Name"]].join("|"); } }
   };
   /* unione di più file: una riga compare tante volte quante nel file che ne ha di più (righe uguali nello stesso file restano) */

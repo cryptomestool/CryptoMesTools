@@ -100,6 +100,23 @@ t("API: ledger convertito nel CSV «Ledgers», unito al CSV senza doppioni", () 
   assert.equal(k.movimenti.filter((x) => x.tipo === "deposit" && !x.tag && voce(x, "a").simbolo === "EUR").length, 1);
 });
 
+t("CSV e API insieme: le righe in comune contano una volta anche senza txid e con numeri scritti diversamente", () => {
+  // CSV vecchio senza colonna txid, fino a marzo 2021
+  const vecchio = '"refid","time","type","subtype","aclass","asset","amount","fee","balance"\n' +
+    '"R1","2021-03-01 10:00:00","deposit","","currency","ZEUR",1000.0000,0.0000,1000.0000\n' +
+    '"T1","2021-03-02 11:00:00.1234","trade","","currency","ZEUR",-500.0000,1.3000,498.7000\n' +
+    '"T1","2021-03-02 11:00:00.1234","trade","","currency","XXBT",0.0100000000,0.0000000000,0.0100000000\n';
+  // API: le stesse due righe dello scambio più una nuova
+  const api = KK.versoCsv({ L2: { refid: "T1", time: 1614682800.1234, type: "trade", subtype: "", aclass: "currency", asset: "ZEUR", amount: "-500", fee: "1.3", balance: "498.7" },
+    L3: { refid: "T1", time: 1614682800.1234, type: "trade", subtype: "", aclass: "currency", asset: "XXBT", amount: "0.01", fee: "0", balance: "0.01" },
+    L4: { refid: "W1", time: 1614769200, type: "withdrawal", subtype: "", aclass: "currency", asset: "XXBT", amount: "-0.005", fee: "0.0001", balance: "0.0049" } });
+  const r = P.leggiFile([{ nome: "vecchio.csv", testo: vecchio }, { nome: "api.csv", testo: api }]).file[0];
+  assert.equal(r.righe, 4);
+  assert.equal(r.movimenti.filter((x) => x.tipo === "trade").length, 1);
+  assert.equal(r.movimenti.length, 3);
+  assert.ok(/4 diverse/.test(r.avvisi[0]));
+});
+
 t("chiave: controlli prima della richiesta", () => {
   assert.ok(KK.controllaChiave("", ""));
   assert.ok(KK.controllaChiave("abc", "corta"));
