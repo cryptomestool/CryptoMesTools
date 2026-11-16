@@ -771,7 +771,8 @@
   }
   /* dichiarazione nei termini: solo le imposte dell'anno, da versare a saldo */
   function tabellaImposte(r) {
-    var righe = r.voci.filter(function (v) { return v.imposta; }).map(function (v) { return "<tr><td>" + esc(v.voce) + '</td><td class="n">' + E(v.imposta) + "</td></tr>"; }).join("");
+    // solo il nome dell'imposta: la parte dopo « · » descrive sanzione e ravvedimento, che nei termini non si applicano
+    var righe = r.voci.filter(function (v) { return v.imposta; }).map(function (v) { return "<tr><td>" + esc(String(v.voce).split(" · ")[0]) + '</td><td class="n">' + E(v.imposta) + "</td></tr>"; }).join("");
     return '<table class="det"><thead><tr><th>Imposta</th><th class="n">Importo</th></tr></thead><tbody>' + (righe || '<tr><td colspan="2" class="muted">Nessuna imposta dovuta</td></tr>') +
       '<tr class="tot"><td>Totale imposte dell\'anno (saldo)</td><td class="n">' + E(r.imposte) + "</td></tr></tbody></table>" +
       (r.ivacaSottoSoglia ? '<p class="small" style="margin:6px 0 0">IVACA calcolata ' + E(r.ivacaCalcolata) + ": non supera " + Z.SOGLIA_IVACA + " € e non si versa (quadro RW comunque da compilare).</p>" : "") +
