@@ -177,13 +177,14 @@
          Acquisto: il nuovo periodo parte dal giorno dell'acquisto. Vendita: il periodo si chiude nel giorno della vendita con la
          quantità detenuta prima, valutata al prezzo di quel giorno, e il residuo apre un nuovo periodo dal giorno successivo.
          Cripto comprata e venduta in giornata: vale il massimo raggiunto. */
-      var periodi = [], cur = null;
+      var periodi = [], cur = null, qGiorni = [];
       giorni.forEach(function (g) {
         var tenuto = saldo > 0n || !!c.entrate[g], apertura = saldo, picco = saldo;
         (c.perGiorno[g] || []).forEach(function (q) { saldo += q; if (saldo < 0n && !negativo) negativo = g; if (saldo > massimo) massimo = saldo; if (saldo > picco) picco = saldo; });
         if (tenuto) { detenuti++; if (!primo) primo = g; if (ultimo && giornoDopo(ultimo) !== g) buchi += 1; ultimo = g; }
         // vendita (quantità in calo): il giorno chiude il periodo con la quantità di prima; il residuo parte dal giorno dopo
         var qGiorno = !tenuto ? 0n : apertura > 0n && saldo < apertura ? apertura : saldo > 0n ? saldo : picco;
+        qGiorni.push(qGiorno > 0n ? decNum(qGiorno) : 0);
         if (qGiorno <= 0n) { cur = null; return; }
         if (cur && cur.q === qGiorno && giornoDopo(cur.al) === g) { cur.al = g; cur.giorni++; }
         else { cur = { dal: g, al: g, q: qGiorno, giorni: 1 }; periodi.push(cur); }
@@ -215,7 +216,7 @@
       if (negativo) note.push("Saldo negativo dal " + it(negativo) + ": storico incompleto, da verificare");
       if (buchi > 0) note.push("Periodi a saldo zero durante l'anno: detenzione non continuativa");
       if (valoreStimato != null && valoreStimato < (o.sogliaResiduo == null ? 1 : o.sogliaResiduo) && detenuti > 0) note.push("Residuo minimo (valore stimato inferiore a " + (o.sogliaResiduo == null ? 1 : o.sogliaResiduo) + " €): esporlo o scartarlo");
-      righe.push({ periodi: periodi, quantitaMedia: qMedia, valoreMedio: valMedio, mai: !(massimo > 0n), chiave: k, simbolo: c.simbolo, iniziale: decStr(iniziale), finale: decStr(finale), inizialeN: decNum(iniziale), finaleN: decNum(finale), giorni: detenuti,
+      righe.push({ periodi: periodi, quantitaGiorni: qGiorni, prezzi: c.prezzi, quantitaMedia: qMedia, valoreMedio: valMedio, mai: !(massimo > 0n), chiave: k, simbolo: c.simbolo, iniziale: decStr(iniziale), finale: decStr(finale), inizialeN: decNum(iniziale), finaleN: decNum(finale), giorni: detenuti,
         primo: primo, ultimo: ultimo, negativo: negativo, interruzioni: buchi, residuo: note.some(function (n) { return /^Residuo/.test(n); }), note: note });
     });
     /* token sospetti (spam, phishing, "address poisoning"): esclusi dai totali ma elencati, l'utente può includerli */
@@ -229,14 +230,104 @@
     var conta = {}; righe.forEach(function (r) { if (!r.spam) conta[r.simbolo] = (conta[r.simbolo] || 0) + 1; });
     righe.forEach(function (r) { r.nome = r.spam || conta[r.simbolo] > 1 ? r.chiave : r.simbolo; });
     righe.sort(function (a, b) { return (a.spam - b.spam) || b.giorni - a.giorni || a.nome.localeCompare(b.nome); });
-    return { anno: anno, fuso: fuso, giorniAnno: giorni.length, transazioniAnno: nAnno, righe: righe,
+    return { anno: anno, fuso: fuso, giorni: giorni, giorniAnno: giorni.length, transazioniAnno: nAnno, righe: righe,
       spam: righe.filter(function (r) { return r.spam; }).length, saldiInizialiDaReport: !!iniz,
+      // report di inizio anno vuoto o tutto a zero: la detenzione parte dal primo movimento dell'anno nel file delle transazioni
+      saldiInizialiZero: !!iniz && Object.keys(iniz).every(function (s) { return FIAT.indexOf(s) >= 0 || dec(iniz[s]) === 0n; }),
+      primoMovimento: righe.filter(function (r) { return !r.spam && r.primo; }).map(function (r) { return r.primo; }).sort()[0] || null,
       // differenze tra report di inizio anno e saldi ricostruiti, esclusi i token sospetti
       differenzeIniziali: diffIniziali.filter(function (d) {
         var r = righe.filter(function (x) { return x.chiave === d.chiave; })[0];
         return !(r && r.spam) && !motivoSpam({ chiave: d.simbolo, mai: false }, false);
       }),
       anomalie: righe.filter(function (r) { return r.negativo && !r.spam; }).length };
+  }
+  /* Fino al 2022 le cripto seguono il regime delle valute (art. 67 c. 1 lett. c-ter e c. 1-ter TUIR). La condizione è annuale:
+     se nell'anno la giacenza complessiva (tutti i wallet, tutte le cripto) valutata al prezzo del 1° gennaio supera 51.645,69 €
+     per almeno 7 giorni lavorativi continui, in qualunque momento dell'anno, tutte le cessioni dell'anno sono rilevanti;
+     altrimenti nessuna. Per ogni cessione si riporta anche, come informazione, la giacenza nell'istante in cui avviene.
+     calc: risultato di calcola; opz: { saldiInizio: saldi del report di inizio anno, inclusi: { chiave: bool }, soglia, giorni,
+       dati: transazioni lette da leggiTransazioni, cessioni: [{ riga, ... }] delle cessioni dell'anno (da KoinlyCosti) }.
+     Giacenza di un giorno precedente: quantità dei periodi di detenzione (nel giorno di una vendita, quella di prima).
+     Prezzo al 1/1: dal report di inizio anno (valore / quantità); per le cripto che non vi compaiono, prezzo della prima
+     transazione dell'anno (stimato) e, in mancanza, l'ultimo prezzo noto prima del 1/1 (stimato). I giorni lavorativi
+     escludono sabati, domeniche, festivi nazionali e Pasquetta: non interrompono il conteggio e non vi entrano. */
+  var SOGLIA_VALUTE = 51645.69, GIORNI_SOGLIA = 7;
+  function sogliaValute(calc, opzioni) {
+    var o = opzioni || {}, soglia = o.soglia == null ? SOGLIA_VALUTE : o.soglia, minimo = o.giorni == null ? GIORNI_SOGLIA : o.giorni;
+    var inizio = calc.anno + "-01-01", rep = {};
+    (o.saldiInizio || []).forEach(function (s) { if (s.tipo !== "fiat" && s.quantita) { var r = rep[s.simbolo] || (rep[s.simbolo] = { q: 0, v: 0 }); r.q += s.quantita; r.v += s.valore || 0; } });
+    var righe = calc.righe.filter(function (r) { return o.inclusi && o.inclusi[r.chiave] != null ? !!o.inclusi[r.chiave] : !r.spam; });
+    var prezzi = [], senzaPrezzo = [];
+    righe.forEach(function (r) {
+      if (!r.quantitaGiorni.some(function (q) { return q > 0; })) return;
+      var px = null, fonte = null, date = Object.keys(r.prezzi || {}).sort();
+      if (rep[r.simbolo] && rep[r.simbolo].q > 0) { px = rep[r.simbolo].v / rep[r.simbolo].q; fonte = "report"; }
+      else {
+        var dopo = date.filter(function (g) { return g >= inizio && g <= calc.anno + "-12-31"; })[0], prima = date.filter(function (g) { return g < inizio; }).pop();
+        if (dopo) { px = r.prezzi[dopo]; fonte = "prima transazione dell'anno (" + it(dopo) + ")"; }
+        else if (prima) { px = r.prezzi[prima]; fonte = "ultimo prezzo noto (" + it(prima) + ")"; }
+      }
+      if (px == null) { senzaPrezzo.push(r.nome); return; }
+      prezzi.push({ chiave: r.chiave, nome: r.nome, prezzo: px, fonte: fonte, stimato: fonte !== "report", q: r.quantitaGiorni });
+    });
+    var corsa = 0, dalCorsa = null, superata = false, dal = null, al = null, maxCorsa = 0, valoreMax = 0, dataMax = null, giorniSopra = 0, primoSopra = null;
+    var valGiorno = {}, sopraGiorno = {};
+    calc.giorni.forEach(function (g, i) {
+      var v = prezzi.reduce(function (a, p) { return a + p.q[i] * p.prezzo; }, 0);
+      valGiorno[g] = v; sopraGiorno[g] = v > soglia;
+      if (v > valoreMax) { valoreMax = v; dataMax = g; }
+      if (!lavorativo(g)) return;
+      if (v > soglia) {
+        giorniSopra++; if (!primoSopra) primoSopra = g;
+        if (!corsa) dalCorsa = g;
+        corsa++; if (corsa > maxCorsa) maxCorsa = corsa;
+        if (corsa >= minimo && !superata) { superata = true; dal = dalCorsa; }
+        if (superata && dal === dalCorsa) al = g;
+      } else corsa = 0;
+    });
+    /* per ogni cessione, come informazione: giacenza nell'istante della cessione (prima di eseguirla) e giorni lavorativi continui sopra la soglia */
+    var esito = null;
+    if (o.dati && o.cessioni) {
+      var fuso = calc.fuso, px = {}, saldo = {}, istante = {}, fine = calc.anno + "-12-31";
+      prezzi.forEach(function (p) { px[p.chiave] = p.prezzo; });
+      righe.forEach(function (r) { if (px[r.chiave] != null) saldo[r.chiave] = r.inizialeN; });
+      o.dati.movimenti.forEach(function (t) {
+        var g = giorno(t.ts, fuso); if (g < inizio || g > fine) return;
+        var tot = 0; Object.keys(saldo).forEach(function (k) { if (saldo[k] > 0) tot += saldo[k] * px[k]; });
+        if (!(t.riga in istante)) istante[t.riga] = { valore: tot, data: g };
+        t.voci.forEach(function (v) { if (px[v.valuta] != null) saldo[v.valuta] += decNum(v.q); });
+      });
+      var cess = o.cessioni.map(function (c) {
+        var ist = istante[c.riga], g = ist ? ist.data : c.data, val = ist ? ist.valore : null, sopra = val != null && val > soglia, n = 0;
+        if (sopra) {
+          // all'indietro dal giorno della cessione: i giorni non lavorativi si saltano, il primo giorno lavorativo sotto la soglia interrompe
+          var d = g;
+          if (lavorativo(d)) n = 1;
+          d = giornoPrima(d);
+          while (d >= inizio && n < minimo) { if (lavorativo(d)) { if (!sopraGiorno[d]) break; n++; } d = giornoPrima(d); }
+          // giacenza oltre la soglia già alla fine dell'anno precedente: i giorni prima del 1/1 si contano col saldo del 1/1
+          if (n < minimo && d < inizio && sopraGiorno[inizio]) { var e = giornoPrima(inizio); while (n < minimo) { if (lavorativo(e)) n++; e = giornoPrima(e); } }
+        }
+        return Object.assign({}, c, { giacenza: val, giorniSopra: n, rilevante: superata });
+      });
+      esito = { cessioni: cess, rilevanti: cess.filter(function (c) { return c.rilevante; }).length, totale: cess.length };
+    }
+    return { anno: calc.anno, applicabile: calc.anno <= 2022, soglia: soglia, giorniRichiesti: minimo, superata: superata, dal: dal, al: al, cessioni: esito,
+      giorniConsecutiviMax: maxCorsa, giorniLavorativiSopra: giorniSopra, primoSopra: primoSopra, valoreMax: valoreMax, dataMax: dataMax,
+      prezzi: prezzi.map(function (p) { return { nome: p.nome, prezzo: p.prezzo, fonte: p.fonte, stimato: p.stimato }; }),
+      stimati: prezzi.filter(function (p) { return p.stimato; }).length, senzaPrezzo: senzaPrezzo };
+  }
+  /* giorno lavorativo: non sabato, domenica, festivo nazionale o Pasquetta */
+  function pasqua(a) {
+    var b = a % 19, c = Math.floor(a / 100), d = a % 100, e = Math.floor(c / 4), f = c % 4, g = Math.floor((8 * c + 13) / 25), h = (19 * b + c - e - g + 15) % 30;
+    var i = Math.floor(d / 4), k = d % 4, l = (32 + 2 * f + 2 * i - h - k) % 7, m = Math.floor((b + 11 * h + 19 * l) / 433), mese = Math.floor((h + l - 7 * m + 90) / 25), giorno = (h + l - 7 * m + 33 * mese + 19) % 32;
+    return a + "-" + ("0" + mese).slice(-2) + "-" + ("0" + giorno).slice(-2);
+  }
+  function lavorativo(g) {
+    var a = +g.slice(0, 4), w = new Date(g + "T00:00:00Z").getUTCDay();
+    if (w === 0 || w === 6) return false;
+    return ["01-01", "01-06", "04-25", "05-01", "06-02", "08-15", "11-01", "12-08", "12-25", "12-26"].map(function (x) { return a + "-" + x; }).concat([giornoDopo(pasqua(a))]).indexOf(g) < 0;
   }
   function motivoSpam(r, secondario) {
     var s = r.chiave.split(";")[0];
@@ -247,6 +338,7 @@
     if (secondario) return "stesso simbolo di un token più usato, con identificativo Koinly diverso";
     return "";
   }
+  function giornoPrima(g) { return new Date(Date.parse(g + "T00:00:00Z") - 86400000).toISOString().slice(0, 10); }
   function giornoDopo(g) { return new Date(Date.parse(g + "T00:00:00Z") + 86400000).toISOString().slice(0, 10); }
   function it(g) { return g ? g.slice(8, 10) + "/" + g.slice(5, 7) + "/" + g.slice(0, 4) : ""; }
 
@@ -266,5 +358,5 @@
     return diff;
   }
 
-  return { leggiTransazioni: leggiTransazioni, calcola: calcola, confronta: confronta, dec: dec, decStr: decStr, decNum: decNum, giorno: giorno, it: it, motivoSpam: motivoSpam, FIAT: FIAT, UNO: UNO };
+  return { leggiTransazioni: leggiTransazioni, calcola: calcola, confronta: confronta, sogliaValute: sogliaValute, lavorativo: lavorativo, SOGLIA_VALUTE: SOGLIA_VALUTE, dec: dec, decStr: decStr, decNum: decNum, giorno: giorno, it: it, motivoSpam: motivoSpam, FIAT: FIAT, UNO: UNO };
 });

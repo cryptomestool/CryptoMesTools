@@ -33,6 +33,13 @@ t("F24: codici 1727, 1715, 8945, 1945, 8911 con anno d'imposta; anni omessi escl
   assert.deepEqual(f.esclusi, [2023]);
   assert.equal(f.totale, Math.round(f.righe.reduce((s, x) => s + x.importo, 0) * 100) / 100);
 });
+t("Ravvedimento 2020 (testo previgente): sanzioni ridotte a 1/6, F24 dell'imposta RT con il codice 1100", () => {
+  const r = Z.calcolaAnno({ anno: 2020, stato: "presentata", valoreRw: 80000, ivaca: 0, plusvalenze: 5000, pagamento: "2026-11-16" });
+  assert.equal(r.frazione.lettera, "b-ter"); assert.ok(/^1\/6/.test(r.frazione.testo));
+  const f = M.f24([r]), cod = (c) => f.righe.find((x) => x.codice === c);
+  assert.equal(cod("1100").importo, 1300); assert.equal(cod("1715"), undefined);
+  assert.ok(Math.abs(cod("8911").importo - 80000 * 0.03 / 6) < 0.01);
+});
 t("Quadri RT al 26% e RM inseriti a mano: righi per anno, minusvalenze pregresse, imposta sul lordo", () => {
   const a = M.quadroRT26(2021, 727.4, 810.2, {});
   assert.equal(a.righi.find((x) => x.rigo === "RT23" && x.col === "1").valore, 83); assert.equal(a.imposta, 0); assert.equal(a.rigoMinus, "RT93 col. 5");

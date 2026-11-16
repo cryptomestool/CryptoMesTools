@@ -114,12 +114,12 @@
       if (!r.ravvedibile) { esclusi.push(r.anno); return; }
       r.voci.forEach(function (v) {
         if (/IVACA/.test(v.voce)) { add("1727", r.anno, v.imposta, "IC saldo", "0101"); add("8945", r.anno, v.sanzione, "sanzione IC"); add("1945", r.anno, v.interessi, "interessi IC"); }
-        else if (/RT/.test(v.voce)) { add("1715", r.anno, v.imposta, "imposta sostitutiva RT"); add("8945", r.anno, v.sanzione, "sanzione RT"); add("1945", r.anno, v.interessi, "interessi RT"); }
+        else if (/RT/.test(v.voce)) { add(r.anno <= 2022 ? "1100" : "1715", r.anno, v.imposta, r.anno <= 2022 ? "imposta sostitutiva RT (regime delle valute)" : "imposta sostitutiva RT"); add("8945", r.anno, v.sanzione, "sanzione RT"); add("1945", r.anno, v.interessi, "interessi RT"); }
         else if (/RW/.test(v.voce)) add("8911", r.anno, v.sanzione, "sanzione RW");
         else if (/tardiva/.test(v.voce)) add("8911", r.anno, v.sanzione, "dichiarazione tardiva");
       });
     });
-    var ordine = ["1727", "1715", "8945", "1945", "8911"];
+    var ordine = ["1727", "1715", "1100", "8945", "1945", "8911"];
     righe.sort(function (a, b) { return a.anno - b.anno || ordine.indexOf(a.codice) - ordine.indexOf(b.codice); });
     return { righe: righe, totale: r2(righe.reduce(function (a, x) { return a + x.importo; }, 0)), esclusi: esclusi };
   }

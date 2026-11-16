@@ -68,4 +68,54 @@ t("IVACA per periodi: valore finale × 0,20% × quota × giorni / 365, valori de
   near(met.totali.ivaca, iv.totali.ivaca / 2);
   assert.ok(!iv.righe.find((r) => r.spam).incluso);
 });
+t("Report di inizio anno vuoto (solo «Totale 0»): saldi a zero, detenzione dal primo movimento dell'anno", () => {
+  const vuoto = L.leggiCsv("Saldi al 2020-01-01 00:00\n\nAttivo,Quantità,Costo (EUR),Valore (EUR),Descrizione\nTotale,-,0.0,0.0,-\n");
+  assert.equal(vuoto.errore, undefined); assert.equal(vuoto.tipoSaldi, "inizio"); assert.equal(vuoto.anno, 2020); assert.equal(vuoto.saldi.length, 0);
+  assert.ok(/zero/.test(vuoto.avvisi.join(" ")));
+  const tx = D.leggiTransazioni([
+    "Date,Type,Tag,Sending Wallet,Sent Amount,Sent Currency,Sent Cost Basis,Receiving Wallet,Received Amount,Received Currency,Received Cost Basis,Fee Amount,Fee Currency,Gain (EUR),Net Value (EUR),Fee Value (EUR),TxSrc,TxDest,TxHash,Description",
+    '2020-04-15 06:39:51 UTC,fiat_deposit,"","","","","",W,"1000,00",EUR,"","","","","1000,00","","","","",',
+    '2020-04-16 10:00:00 UTC,buy,"",W,"1000,00",EUR,"",W,"0,15",BTC,"","","","","1000,00","","","","",'].join("\n"));
+  const z = D.calcola(tx, 2020, { iniziali: {} });
+  assert.ok(z.saldiInizialiZero); assert.equal(z.primoMovimento, "2020-04-16"); assert.equal(z.differenzeIniziali.length, 0);
+  const b = z.righe.find((r) => r.simbolo === "BTC");
+  assert.equal(b.inizialeN, 0); assert.equal(b.periodi.length, 1); assert.equal(b.periodi[0].dal, "2020-04-16"); assert.equal(b.giorni, 260);
+  near(b.periodi[0].valoreIniziale, 1000);
+  const v = I.calcola(z, { saldiInizio: vuoto.saldi, saldiFine: [] });
+  assert.equal(v.righe[0].periodi[0].fonteIniziale, "transazione");
+  assert.ok(!c.saldiInizialiZero);
+});
+t("Soglia delle valute fino al 2022: 51.645,69 € per 7 giorni lavorativi continui, prezzi al 1° gennaio", () => {
+  const H = "Date,Type,Tag,Sending Wallet,Sent Amount,Sent Currency,Sent Cost Basis,Receiving Wallet,Received Amount,Received Currency,Received Cost Basis,Fee Amount,Fee Currency,Gain (EUR),Net Value (EUR),Fee Value (EUR),TxSrc,TxDest,TxHash,Description";
+  const r = (d, sa, sc, ra, rc, v) => d + " 10:00:00 UTC,trade,,W," + sa + "," + sc + ",,W," + ra + "," + rc + ",,,,," + v + ",,,,,";
+  // 1 BTC al 1/1/2021 (report: 25.000 €), altro 1 BTC comprato lunedì 1/3 a 40.000 € (vale comunque il prezzo del report),
+  // 10 ETH comprati il 1/3 a 1.300 € (non nel report: prezzo della prima transazione). Giacenza al prezzo del 1/1: 2×25.000 + 10×1.300 = 63.000
+  const tx = D.leggiTransazioni([H, r("2020-06-01", "9000", "EUR", "1", "BTC", "9000"), r("2021-03-01", "40000", "EUR", "1", "BTC", "40000"),
+    r("2021-03-01", "13000", "EUR", "10", "ETH", "13000"), r("2021-03-05", "1", "ETH", "1500", "EUR", "1500"), r("2021-03-09", "2", "BTC", "100000", "EUR", "100000")].join("\n"));
+  const iniz = L.leggiCsv('Saldi al 2021-01-01 00:00\n\nAttivo,Quantità,Costo (EUR),Valore (EUR),Descrizione\nBTC (Bitcoin),1.00000000,"9,000.00","25,000.00",-\nTotale,-,"9,000.00","25,000.00",-\n');
+  const c21 = D.calcola(tx, 2021, { iniziali: { BTC: "1" } });
+  const v = D.sogliaValute(c21, { saldiInizio: iniz.saldi });
+  // lun 1/3 - mar 9/3 (giorno della vendita, con la quantità di prima): 7 giorni lavorativi
+  assert.ok(v.applicabile); assert.ok(v.superata); assert.equal(v.dal, "2021-03-01"); assert.equal(v.al, "2021-03-09"); assert.equal(v.giorniConsecutiviMax, 7);
+  near(v.valoreMax, 63000); assert.equal(v.stimati, 1);
+  assert.equal(v.prezzi.find((p) => p.nome === "BTC").fonte, "report"); near(v.prezzi.find((p) => p.nome === "ETH").prezzo, 1300);
+  // con la soglia un po' più alta, o 8 giorni richiesti, non è superata
+  assert.ok(!D.sogliaValute(c21, { saldiInizio: iniz.saldi, giorni: 8 }).superata);
+  // soglia non superata: nessuna cessione rilevante
+  { const C0 = require("../costi.js"), ces0 = C0.calcola(tx, { anno: 2021 }).cessioni.filter((z) => C0.rilevante(z.tipo, 2021));
+    assert.equal(D.sogliaValute(c21, { saldiInizio: iniz.saldi, dati: tx, cessioni: ces0, giorni: 8 }).cessioni.rilevanti, 0); }
+  assert.ok(!D.sogliaValute(c21, { saldiInizio: iniz.saldi, soglia: 63000 }).superata);
+  // festivi: Pasquetta 2022 (18/4) e 25/4 non sono lavorativi; sabato e domenica nemmeno
+  assert.ok(!D.lavorativo("2022-04-18")); assert.ok(!D.lavorativo("2022-04-25")); assert.ok(!D.lavorativo("2022-04-23")); assert.ok(D.lavorativo("2022-04-19"));
+  assert.ok(!D.sogliaValute(c, {}).applicabile);
+  // condizione annuale: la soglia è superata (7 giorni lavorativi dal 1/3 al 9/3), quindi sono rilevanti tutte le cessioni dell'anno,
+  // anche quella di venerdì 5/3 quando i giorni sopra la soglia erano solo 5. Giacenza nell'istante e giorni restano come informazione.
+  const C = require("../costi.js");
+  const ces = C.calcola(tx, { anno: 2021 }).cessioni.filter((z) => C.rilevante(z.tipo, 2021));
+  const w = D.sogliaValute(c21, { saldiInizio: iniz.saldi, dati: tx, cessioni: ces });
+  assert.equal(w.cessioni.totale, 2); assert.equal(w.cessioni.rilevanti, 2);
+  const eth = w.cessioni.cessioni.find((z) => z.cripto === "ETH"), btc = w.cessioni.cessioni.find((z) => z.cripto === "BTC");
+  near(eth.giacenza, 63000); assert.equal(eth.giorniSopra, 5); assert.ok(eth.rilevante);
+  near(btc.giacenza, 61700); assert.equal(btc.giorniSopra, 7); assert.ok(btc.rilevante);
+});
 console.log("\n" + n + " prove superate");

@@ -137,7 +137,7 @@
       var intOm = out.voci.reduce(function (a, v) { return a + (v.interessi || 0); }, 0), omRw = valoreRw * 0.03;
       var omImp = imposte > 0 ? Math.max(imposte * 1.2 * mEst, 250) : 250;
       out.voci.push({ voce: "Sanzione per omessa dichiarazione: " + (esteri ? "160% (120% aumentato di 1/3 per redditi esteri, c. 8 previgente)" : "120%") + " delle imposte" + (nuovo ? "" : " (minimo; previgente dal 120% al 240%)") + ", minimo 250 € (art. 1 c. 1 D.Lgs. 471/1997)", imposta: 0, sanzione: omImp, interessi: 0 });
-      out.voci.push({ voce: "Sanzione quadro RW: 3% (minimo, art. 5 c. 2 DL 167/1990) del valore non dichiarato di " + fmt(valoreRw), imposta: 0, sanzione: omRw, interessi: 0 });
+      out.voci.push({ voce: "Sanzione quadro RW: 3% (minimo, art. 5 c. 2 DL 167/1990) del valore non dichiarato di " + fmt(valoreRw), imposta: 0, sanzione: omRw, interessi: 0, calcolo: { base: valoreRw, baseTesto: "valore delle cripto-attività non indicate nel quadro RW", aliquota: 0.03, piena: omRw } });
       out.sanzionePiena = omImp + omRw;
       out.sanzioneUnTerzo = out.sanzionePiena / 3;
       out.versioni = [{ titolo: "Contestazione dell'Agenzia, sanzioni minime senza riduzioni", sanzione: out.sanzionePiena }, { titolo: "Contestazione definita con il pagamento di un terzo", sanzione: out.sanzioneUnTerzo }];
@@ -166,8 +166,8 @@
       // ravvedimento precluso dalla notifica dell'atto: sanzione piena per infedele e RW, definibile a 1/3 (acquiescenza)
       out.ravvedibile = false; out.precluso = true;
       var bp = nuovo ? 0.7 : 0.9 * mEst, rid = d.riduzione ? 2 / 3 : 1, fr = d.fraudolente ? 1.5 : 1, piena = 0;
-      tributi.forEach(function (x) { if (!(x[1] > 0)) return; var s = Math.max(x[1] * bp * rid * fr, 150 * rid); piena += s; out.voci.push({ voce: x[0] + " · infedele " + pct(bp * rid * fr) + ", minimo " + fmt(150 * rid) + " (art. 1 c. 2 D.Lgs. 471/1997" + (nuovo ? "" : " previgente") + ")", imposta: x[1], sanzione: s, interessi: interessi(x[1], T.saldo, pag).importo }); });
-      if (valoreRw > 0) { piena += valoreRw * 0.03; out.voci.push({ voce: "Quadro RW · 3% (minimo, art. 5 c. 2 DL 167/1990) di " + fmt(valoreRw), imposta: 0, sanzione: valoreRw * 0.03, interessi: 0 }); }
+      tributi.forEach(function (x) { if (!(x[1] > 0)) return; var s = Math.max(x[1] * bp * rid * fr, 150 * rid); piena += s; out.voci.push({ voce: x[0] + " · infedele " + pct(bp * rid * fr) + ", minimo " + fmt(150 * rid) + " (art. 1 c. 2 D.Lgs. 471/1997" + (nuovo ? "" : " previgente") + ")", imposta: x[1], sanzione: s, interessi: interessi(x[1], T.saldo, pag).importo, calcolo: { base: x[1], baseTesto: "imposta non dichiarata", aliquota: bp * rid * fr, minimo: 150 * rid, piena: s } }); });
+      if (valoreRw > 0) { piena += valoreRw * 0.03; out.voci.push({ voce: "Quadro RW · 3% (minimo, art. 5 c. 2 DL 167/1990) di " + fmt(valoreRw), imposta: 0, sanzione: valoreRw * 0.03, interessi: 0, calcolo: { base: valoreRw, baseTesto: "valore delle cripto-attività non indicate nel quadro RW", aliquota: 0.03, piena: valoreRw * 0.03 } }); }
       out.sanzionePiena = piena; out.sanzioneUnTerzo = piena / 3;
       out.versioni = [{ titolo: "Sanzioni minime dell'atto, senza riduzioni", sanzione: piena }, { titolo: "Acquiescenza o definizione: un terzo delle sanzioni", sanzione: piena / 3, principale: true }];
       out.sanzioni = piena / 3; out.totale = imposte + out.voci.reduce(function (a, v) { return a + (v.interessi || 0); }, 0) + piena / 3;
@@ -192,7 +192,8 @@
       var bv = baseVersamento(T.saldo, pag), fv = frazioneVersamento(T.saldo, pag);
       tributi.forEach(function (x) {
         if (!(x[1] > 0)) return;
-        out.voci.push({ voce: x[0] + " · omesso versamento " + bv.testo + " ridotto a " + fv.testo, imposta: x[1], sanzione: pag > T.saldo ? x[1] * bv.aliquota * fv.f : 0, interessi: interessi(x[1], T.saldo, pag).importo, frazione: fv });
+        out.voci.push({ voce: x[0] + " · omesso versamento " + bv.testo + " ridotto a " + fv.testo, imposta: x[1], sanzione: pag > T.saldo ? x[1] * bv.aliquota * fv.f : 0, interessi: interessi(x[1], T.saldo, pag).importo, frazione: fv,
+          calcolo: pag > T.saldo ? { base: x[1], baseTesto: "imposta non versata", aliquota: bv.aliquota, piena: x[1] * bv.aliquota, frazione: fv } : null });
       });
       return avvertenze(chiudi(out), d, imposte, impRt, valoreRw);
     }
@@ -209,10 +210,12 @@
     tributi.forEach(function (x) {
       if (!(x[1] > 0)) return;
       // il minimo in euro si applica quando la percentuale dà un importo inferiore, e si riduce anch'esso con il ravvedimento
-      var s = Math.max(x[1] * aliq, minimo) * fd.f;
-      out.voci.push({ voce: x[0] + " · " + testoInf + ", ridotta a " + fd.testo, imposta: x[1], sanzione: s, interessi: interessi(x[1], T.saldo, pag).importo, frazione: fd });
+      var piena = Math.max(x[1] * aliq, minimo), s = piena * fd.f;
+      out.voci.push({ voce: x[0] + " · " + testoInf + ", ridotta a " + fd.testo, imposta: x[1], sanzione: s, interessi: interessi(x[1], T.saldo, pag).importo, frazione: fd,
+        calcolo: { base: x[1], baseTesto: "imposta non versata", aliquota: aliq, minimo: minimo, piena: piena, frazione: fd } });
     });
-    if (valoreRw > 0) out.voci.push({ voce: "Quadro RW · 3% (minimo, art. 5 c. 2 DL 167/1990) di " + fmt(valoreRw) + ", ridotto a " + fd.testo, imposta: 0, sanzione: valoreRw * 0.03 * fd.f, interessi: 0, frazione: fd });
+    if (valoreRw > 0) out.voci.push({ voce: "Quadro RW · 3% (minimo, art. 5 c. 2 DL 167/1990) di " + fmt(valoreRw) + ", ridotto a " + fd.testo, imposta: 0, sanzione: valoreRw * 0.03 * fd.f, interessi: 0, frazione: fd,
+      calcolo: { base: valoreRw, baseTesto: "valore delle cripto-attività non indicate nel quadro RW", aliquota: 0.03, piena: valoreRw * 0.03, frazione: fd } });
     if (!c2 && d.riduzione) out.note.push("La riduzione di 1/3 dell'art. 1 c. 4 riguarda la sanzione del comma 2 (infedele contestata), non quella del comma 2-bis: non è applicata.");
     if (nuovo && imposte > 0 && !c2) {
       // per confronto: infedele contestata dall'Agenzia, art. 1 c. 2 nel nuovo testo (70%, minimo 150 €), senza le riduzioni del ravvedimento

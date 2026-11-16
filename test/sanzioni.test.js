@@ -108,4 +108,11 @@ t("Caso dubbio: 2023 con termine al 31/10/2024 ma dichiarazione inviata prima de
   const r = Z.calcolaAnno({ anno: 2023, stato: "presentata", valoreRw: 10000, ivaca: 20, plusvalenze: 5000, pagamento: PAG, invio: "2024-07-15" });
   assert.equal(r.regime, "nuovo"); assert.ok(r.note.some((x) => /Caso dubbio/.test(x)));
 });
+t("Calcolo esplicito delle sanzioni: base × aliquota = sanzione piena, ridotta a 1/6 (2020, testo previgente)", () => {
+  const r = Z.calcolaAnno({ anno: 2020, stato: "presentata", valoreRw: 100000, ivaca: 0, plusvalenze: 10000, pagamento: "2026-11-16" });
+  const rw = r.voci.find((v) => /RW/.test(v.voce)).calcolo, rt = r.voci.find((v) => /RT/.test(v.voce)).calcolo;
+  assert.equal(rw.base, 100000); assert.equal(rw.aliquota, 0.03); near(rw.piena, 3000); assert.equal(rw.frazione.lettera, "b-ter");
+  near(r.voci.find((v) => /RW/.test(v.voce)).sanzione, 500);
+  assert.equal(rt.base, 2600); assert.equal(rt.aliquota, 0.9); near(rt.piena, 2340); near(r.voci.find((v) => /RT/.test(v.voce)).sanzione, 390);
+});
 console.log("\n" + n + " prove superate");

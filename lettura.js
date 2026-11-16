@@ -151,7 +151,7 @@
     r.avvisi = [];
     if (!r.anno) r.avvisi.push("Anno del report non trovato: indicarlo a mano.");
     if (r.annoSolare === false) r.avvisi.push(r.fonte === "csv" ? "Il CSV riporta i saldi al " + (r.dataSaldi || "(data sconosciuta)") + ", né al 1° gennaio né al 31 dicembre." : "Il periodo del report non è un anno solare intero (" + r.periodo + "): i saldi potrebbero non essere quelli al 31/12.");
-    if (!r.saldi.length) r.avvisi.push("Nessun saldo di fine anno trovato nel documento.");
+    if (!r.saldi.length) r.avvisi.push(r.tipoSaldi ? "Il report non contiene saldi: tutte le quantità al " + (r.dataSaldi || "") + " sono zero." : "Nessun saldo di fine anno trovato nel documento.");
     if (r.totaleReport && r.totaleReport.valore != null && Math.abs(r.totaleReport.valore - r.valoreTotale) > Math.max(2, r.totaleReport.valore * 0.001))
       r.avvisi.push("La somma dei saldi letti (" + r.valoreTotale.toFixed(2) + " €) non coincide con il totale del report (" + r.totaleReport.valore.toFixed(2) + " €): controllare righe mancanti.");
     if (r.valoreFiat > 0) r.avvisi.push("Il report contiene saldi in valuta tradizionale (" + r.saldi.filter(function (x) { return x.tipo === "fiat"; }).map(function (x) { return x.simbolo; }).join(", ") + "): sono esclusi dal valore delle cripto-attività.");

@@ -20,12 +20,13 @@ File richiesti (tutti obbligatori):
 Criteri (regole dello studio):
 
 - **Perimetro:** totale di tutti i wallet per cripto; escluse le valute tradizionali, incluse le stablecoin.
-- **Saldi al 1/1:** presi dal report di inizio anno e confrontati con quelli ricostruiti dalle transazioni.
+- **Saldi al 1/1:** presi dal report di inizio anno e confrontati con quelli ricostruiti dalle transazioni. Se il report è vuoto (solo «Totale 0») i saldi sono zero e la detenzione parte dal primo movimento del file delle transazioni, con il valore di quel giorno; se il report manca ma nel file non ci sono movimenti prima del 1/1, vale lo stesso.
 - **Giorno detenuto:** conta se il saldo a inizio giornata è positivo o se nel giorno c'è un'entrata. Aritmetica esatta sui decimali.
 - **Periodi:** ogni cambio di quantità apre un periodo. Un acquisto lo apre dal giorno stesso. Una vendita chiude il periodo nel giorno della vendita, con la quantità di prima e il valore a quella data; il residuo riparte dal giorno dopo.
 - **Valori:** valore iniziale e finale sono quelli di inizio e fine detenzione di ogni periodo, non del 1/1 e del 31/12. Il valore iniziale di un periodo è il valore finale del precedente; il primo parte dal report di inizio anno. Prezzi dal controvalore in euro delle transazioni; dai report per i periodi che iniziano il 1/1 o finiscono il 31/12.
 - **IVACA** (rigo RW col. 33) = valore finale × 0,20% × quota × giorni / 365, per periodo.
 - **Token sospetti** (spam, phishing, imitazioni di USDT/USDC con caratteri non latini, saldi mai positivi): esclusi dai totali, elencati e includibili.
+- **Soglia delle valute (anni fino al 2022):** le cripto seguono il regime delle valute (art. 67 c. 1 lett. c-ter e c. 1-ter TUIR). La condizione è annuale: se in un qualunque momento dell'anno la giacenza complessiva di tutti i wallet e di tutte le cripto, valutata al prezzo del 1° gennaio dell'anno, supera 51.645,69 € per almeno 7 giorni lavorativi continui, tutte le cessioni dell'anno sono rilevanti, anche quelle fatte quando la giacenza era sotto la soglia; altrimenti nessuna. Per i giorni vale la quantità dei periodi di detenzione. Prezzi al 1/1 dal report di inizio anno; per le cripto che non vi compaiono, prezzo della prima transazione dell'anno o ultimo noto, segnalati come stimati. Giorni lavorativi: esclusi sabati, domeniche, festivi nazionali e Pasquetta. L'esito, il primo tratto sopra la soglia e, come informazione, la giacenza nell'istante di ogni cessione sono nella scheda dei giorni di detenzione e nel riepilogo degli anni.
 
 Uscite: tabella a video con i periodi; Excel (fogli «Righi RW» e «Riepilogo per cripto», A4 orizzontale, imposta a formula); resoconto da stampare o salvare in PDF con tutti i periodi.
 
@@ -109,7 +110,7 @@ Fonti in [docs/FONTI.md](docs/FONTI.md).
 
 Prospetti compilati secondo i modelli ministeriali, stampabili in PDF con l'intestazione dello studio:
 
-- **Quadro RW:** un rigo per periodo di detenzione, cinque righi per modulo. Colonne: col. 1 titolo, col. 3 codice 21, col. 5 quota, col. 6 criterio 1, col. 7 e 8 valori in euro, col. 10 giorni, col. 33 e 34 imposta. Rigo RW8 con il totale esatto arrotondato all'euro. Le cripto con molti periodi (soglia modificabile) vanno in un rigo unico con valore medio ponderato e giorni complessivi.
+- **Quadro RW:** un rigo per periodo di detenzione, cinque righi per modulo. Colonne: col. 1 titolo, col. 3 codice 21, col. 5 quota, col. 6 criterio 1, col. 7 e 8 valori in euro, col. 10 giorni, col. 33 e 34 imposta. Rigo RW8 con il totale esatto arrotondato all'euro. Le cripto con molti periodi (soglia modificabile) vanno in un rigo unico con valore medio ponderato e giorni complessivi. Il prospetto è disegnato come il modello Redditi PF (fascicolo 2): moduli di cinque righi RW1-RW5, ogni rigo con le caselle numerate (col. 1-8, 9-16 e 29-34, con le etichette del modello) e, subito sopra, la cripto, il periodo e la quantità a cui si riferisce (per esempio «Cripto BTC · 01/01/2024 – 10/03/2024 · 1 BTC»); in fondo il rigo RW8 con le sei caselle dell'imposta cripto-attività. Le colonne 17-21 (società, entità giuridiche, cointestatari) non servono alle cripto e non sono riportate.
 - **Quadro RT:** sezione cripto-attività con i righi del modello dell'anno.
 
   | Anno | Modello | Righi | Franchigia di 2.000 € |
@@ -119,6 +120,7 @@ Prospetti compilati secondo i modelli ministeriali, stampabili in PDF con l'inte
   | 2025 | Redditi PF 2026 | RT41 col. 3-4 | nessuna |
 
   Plusvalenza = corrispettivi − costi.
+  Fino al 2022: con i costi ricostruiti vanno nella sezione dei redditi diversi al 26% (RT21-RT29, codice tributo 1100) tutte le cessioni dell'anno (anche le permute tra cripto) se la soglia delle valute è superata; se non è superata il quadro RT resta vuoto e le plusvalenze per le sanzioni sono zero.
 - **Proventi da detenzione** (staking, reward, airdrop, interessi, cashback): dal 2023 sono redditi diversi dell'art. 67 c. 1 lett. c-sexies TUIR al ricevimento e si sommano ai corrispettivi del quadro RT a costo zero; le cripto ricevute entrano nei costi di carico con lo stesso valore. Fonte: «Income report» CSV dell'anno o, in mancanza, il riepilogo redditi del «Complete tax report». Escludibili anno per anno nella scheda Sanzioni. Fino al 2022 restano fuori dal quadro RT delle cripto.
 - **Other gains** (derivati, futures, margin): non entrano nel quadro RT delle cripto. Lo studio sceglie per anno, secondo il tipo di reddito, se riportarli nel quadro RT al 26% (redditi diversi: profitti come corrispettivi, perdite come costi) o nel quadro RM (redditi di capitale: profitti al lordo, perdite non deducibili).
 - **F24, sezione Erario:**
@@ -126,12 +128,14 @@ Prospetti compilati secondo i modelli ministeriali, stampabili in PDF con l'inte
   | Codice | Uso | Fonte |
   |---|---|---|
   | 1727 | Imposta sulle cripto-attività, saldo (rateazione 0101) | Ris. 36/E/2023 e 10/E/2024 |
-  | 1715 | Imposta sostitutiva RT | Ris. 36/E/2023 |
+  | 1715 | Imposta sostitutiva RT dal 2023 | Ris. 36/E/2023 |
+  | 1100 | Imposta sostitutiva RT fino al 2022 (regime delle valute, sezione al 26%) | sanzione e interessi restano 8945 e 1945: da verificare |
   | 8945 | Sanzione da ravvedimento | Ris. 12/E/2023; per l'IC per analogia |
   | 1945 | Interessi da ravvedimento | Ris. 12/E/2023; per l'IC per analogia |
   | 8911 | Sanzione RW e dichiarazione tardiva | |
 
   Anno di riferimento = anno d'imposta. Gli anni con dichiarazione omessa non vanno in F24.
+- **Fascicolo finale: stampa** (ultima scheda di ogni percorso, dopo tutte le altre): riepilogo per anno a video, contenuto del fascicolo con quello che c'è e quello che manca, e il pulsante «Stampa fascicolo», che si trova solo qui (nelle altre schede c'è il rimando «Vai al fascicolo finale»). Gli anni con transazioni e saldi di inizio e fine anno entrano da soli. Il fascicolo per il contribuente contiene, nell'ordine: riepilogo di tutti gli anni (valore RW, IVACA, plusvalenze, riduzione delle sanzioni, imposte, sanzioni, interessi, totale); per ogni anno giorni di detenzione, quadro RW, soglia delle valute fino al 2022, quadro RT, quadri RT al 26% e RM degli altri redditi (broker esteri), sanzioni RW e RT e ravvedimento; il modello F24; **il lavoro svolto per il contribuente** (file ricevuti, operazioni, wallet, correzioni dello studio e, anno per anno, cripto detenute, token esclusi, righi RW, riscontro con il report di fine anno, soglia delle valute, quadro RT ed esito del ravvedimento); in fondo la **metodologia utilizzata per i calcoli** (dati usati, perimetro, saldi iniziali, giorni e periodi, RW e IVACA, costi LIFO, soglia delle valute, quadro RT, sanzioni e riduzioni anno per anno, prezzi e valori di mercato: valore medio rilevato da Koinly sulle piattaforme di scambio al momento di ogni operazione). Le imposte dei quadri RM e RT al 26% degli altri redditi non entrano nel calcolo delle sanzioni. La riduzione da ravvedimento di ogni anno (per esempio 1/6, art. 13 c. 1 lett. b-ter D.Lgs. 472/1997) è in evidenza anche a video. Sotto ogni sanzione c'è il calcolo esplicito: base (valore delle cripto non indicate in RW, dal report di fine anno, o imposta non versata) × aliquota (3% per il RW, 90% o 70%/50% per l'infedele, con l'eventuale minimo) = sanzione piena, poi ridotta con la frazione del ravvedimento (per esempio 100.000,00 € × 3% = 3.000,00 € → × 1/6 = 500,00 €).
 
 ## 7. Pratica con l'Agenzia delle Entrate
 
