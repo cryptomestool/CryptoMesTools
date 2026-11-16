@@ -159,19 +159,22 @@
     document.getElementById("steps").innerHTML = GRUPPI.map(function (g) {
       var prima = g.viste.filter(function (v) { return vis.indexOf(VISTE.indexOf(v)) >= 0; })[0];
       if (!prima) return "";
-      var nome = g.viste.indexOf("questionario") >= 0 && S.percorso === "fascicolo" ? "Fascicolo per i controlli" : g.nome;
+      var nome = g.viste.indexOf("questionario") >= 0 && S.percorso === "fascicolo" ? "Fascicolo per i controlli" : g.viste.indexOf("sanzioni") >= 0 && ordinaria() ? "Quadri RW, RT e F24" : g.nome;
       return '<button type="button" data-tab="' + VISTE.indexOf(prima) + '"' + (g === attuale ? ' aria-current="step"' : "") + '><span class="n">' + (n++) + "</span>" + esc(nome) + "</button>";
     }).join("");
   }
   /* ---------- percorso scelto all'inizio: che cosa deve fare il cliente ---------- */
   var PERCORSI = {
-    dichiarazione: { titolo: "La dichiarazione", testo: "Quadri RW e RT, imposta sulle cripto-attività, F24; ravvedimento per gli anni passati.", schede: ["guida", "caricamento", "costi", "ivaca", "modelli", "sanzioni", "riepilogo"] },
+    ordinaria: { titolo: "Dichiarazione nei termini", testo: "Quadri RW e RT, imposta sulle cripto-attività (IVACA) e F24 di saldo dell'anno da dichiarare. Niente sanzioni né ravvedimento.", schede: ["guida", "caricamento", "costi", "ivaca", "modelli", "sanzioni", "riepilogo"] },
+    ravvedimento: { titolo: "Ravvedimento per gli anni passati", testo: "Anni in cui le cripto non sono state dichiarate: quadri RW e RT, imposte, sanzioni ridotte, interessi e F24.", schede: ["guida", "caricamento", "costi", "ivaca", "modelli", "sanzioni", "riepilogo"] },
     agenzia: { titolo: "Rispondere all'Agenzia delle Entrate", testo: "Invito o questionario, schema di atto, atto di contestazione: risposte, osservazioni, opzioni e scadenze.", schede: VISTE },
-    entrambe: { titolo: "Entrambe le cose", testo: "Dichiarazione o ravvedimento e risposta all'Agenzia per gli stessi anni.", schede: VISTE },
+    entrambe: { titolo: "Ravvedimento e risposta all'Agenzia", testo: "Ravvedimento e risposta all'Agenzia per gli stessi anni.", schede: VISTE },
     fascicolo: { titolo: "Creare il fascicolo per i controlli", testo: "Preparare in anticipo costi, valori, risposte alle domande tipo, wallet e provenienza dei fondi, da consegnare se arriva un controllo.", schede: ["guida", "caricamento", "costi", "ivaca", "modelli", "questionario"] }
   };
   S.percorso = (function () { try { return localStorage.getItem("koinlyPercorso") || null; } catch (e) { return null; } })();
   if (S.percorso && !PERCORSI[S.percorso]) S.percorso = null;
+  /* dichiarazione nei termini: nessuna sanzione, nessun interesse, niente ravvedimento a video e nei fascicoli */
+  function ordinaria() { return S.percorso === "ordinaria"; }
   function scegliPercorsoA(p) { S.percorso = p; try { if (p) localStorage.setItem("koinlyPercorso", p); else localStorage.removeItem("koinlyPercorso"); } catch (e) {} }
   function schedePercorso() { var v = S.percorso ? PERCORSI[S.percorso].schede : VISTE; return VISTE.map(function (x, i) { return v.indexOf(x) >= 0 ? i : -1; }).filter(function (i) { return i >= 0; }); }
   // riquadri di caricamento per percorso: dichiarazioni dei redditi ed estratti conto servono sempre (provenienza dei fondi)
@@ -187,16 +190,16 @@
   function daProdurre() {
     var tab = function (v) { return VISTE.indexOf(v); }, qa = S.quest.anni.length, pr = S.percorso;
     var voci = [
-      { per: ["dichiarazione", "agenzia", "entrambe", "fascicolo"], doc: "Costi di carico LIFO (Excel e PDF)", scheda: "costi", pronto: !!S.tx, manca: "le transazioni Koinly" },
-      { per: ["dichiarazione", "agenzia", "entrambe", "fascicolo"], doc: "Giorni di detenzione e IVACA (Excel e PDF)", scheda: "ivaca", pronto: !!ivaca, manca: "transazioni e saldi di inizio e fine anno" },
-      { per: ["dichiarazione", "entrambe", "fascicolo"], doc: "Quadro RW e quadro RT", scheda: "modelli", pronto: !!ivaca, manca: "i calcoli della scheda Giorni di detenzione" },
-      { per: ["dichiarazione", "entrambe"], doc: "Modello F24 (saldo e ravvedimento)", scheda: "sanzioni", pronto: S.sanz.anni.length > 0, manca: "gli anni nella scheda Sanzioni" },
-      { per: ["dichiarazione", "agenzia", "entrambe"], doc: "Fascicolo per il contribuente: riepilogo, metodologia, quadri RW, RT e RM, sanzioni e F24 (PDF)", scheda: "riepilogo", pronto: S.sanz.anni.length > 0, manca: "gli anni nella scheda Sanzioni" },
-      { per: ["dichiarazione", "agenzia", "entrambe", "fascicolo"], doc: "Quadri dei broker esteri (RT al 26%, RM, RW)", scheda: "modelli", pronto: !!S.etoro || S.broker.length > 0, manca: "i rendiconti, se ci sono broker esteri", facoltativo: true },
+      { per: ["ordinaria", "ravvedimento", "agenzia", "entrambe", "fascicolo"], doc: "Costi di carico LIFO (Excel e PDF)", scheda: "costi", pronto: !!S.tx, manca: "le transazioni Koinly" },
+      { per: ["ordinaria", "ravvedimento", "agenzia", "entrambe", "fascicolo"], doc: "Giorni di detenzione e IVACA (Excel e PDF)", scheda: "ivaca", pronto: !!ivaca, manca: "transazioni e saldi di inizio e fine anno" },
+      { per: ["ordinaria", "ravvedimento", "entrambe", "fascicolo"], doc: "Quadro RW e quadro RT", scheda: "modelli", pronto: !!ivaca, manca: "i calcoli della scheda Giorni di detenzione" },
+      { per: ["ordinaria", "ravvedimento", "entrambe"], doc: ordinaria() ? "Modello F24 (saldo)" : "Modello F24 (saldo e ravvedimento)", scheda: "sanzioni", pronto: S.sanz.anni.length > 0, manca: "gli anni nella scheda Sanzioni" },
+      { per: ["ordinaria", "ravvedimento", "agenzia", "entrambe"], doc: "Fascicolo per il contribuente: riepilogo, metodologia, quadri RW, RT e RM, " + (ordinaria() ? "imposte" : "sanzioni") + " e F24 (PDF)", scheda: "riepilogo", pronto: S.sanz.anni.length > 0, manca: "gli anni nella scheda Sanzioni" },
+      { per: ["ordinaria", "ravvedimento", "agenzia", "entrambe", "fascicolo"], doc: "Quadri dei broker esteri (RT al 26%, RM, RW)", scheda: "modelli", pronto: !!S.etoro || S.broker.length > 0, manca: "i rendiconti, se ci sono broker esteri", facoltativo: true },
       { per: ["agenzia", "entrambe"], doc: "Sanzioni e ravvedimento degli anni contestati", scheda: "sanzioni", pronto: S.sanz.anni.length > 0, manca: "gli anni nella scheda Sanzioni" },
       { per: ["agenzia", "entrambe", "fascicolo"], doc: pr === "fascicolo" ? "Risposte alle domande tipo dei controlli (PDF ed Excel)" : "Risposte al questionario: fascicolo PDF ed Excel", scheda: "questionario", pronto: qa > 0, manca: "gli anni da coprire" },
       { per: ["agenzia", "entrambe", "fascicolo"], doc: "Dichiarazione sostitutiva sui wallet", scheda: "questionario", pronto: qa > 0 && !!S.quest.cliente.nome, manca: "anni, attribuzione dei wallet e dati del dichiarante" },
-      { per: ["dichiarazione"], doc: "Verifica della provenienza dei fondi", scheda: "modelli", pronto: !!S.tx && conRedditi(), manca: "le transazioni e il reddito delle dichiarazioni (o altre fonti)" },
+      { per: ["ordinaria", "ravvedimento"], doc: "Verifica della provenienza dei fondi", scheda: "modelli", pronto: !!S.tx && conRedditi(), manca: "le transazioni e il reddito delle dichiarazioni (o altre fonti)" },
       { per: ["agenzia", "entrambe", "fascicolo"], doc: "Verifica della provenienza dei fondi", scheda: "questionario", pronto: qa > 0 && conRedditi(), manca: "gli anni e il reddito delle dichiarazioni (o altre fonti)" },
       { per: ["agenzia", "entrambe", "fascicolo"], doc: "Memoria tecnica in Word", scheda: "questionario", pronto: qa > 0, manca: "gli anni da coprire" },
       { per: ["agenzia", "entrambe"], doc: "Osservazioni allo schema di atto o valutazione dell'atto di contestazione", scheda: "pratica", pronto: S.atti.length > 0, manca: "l'atto ricevuto, quando arriva", facoltativo: true }
@@ -594,7 +597,10 @@
      con il valore RW del report di fine anno e, dal 2023, l'IVACA calcolata; RT dai costi ricostruiti. Un anno tolto a mano non rientra. */
   function sincronizzaAnni() {
     if (!S.tx) return;
-    anniIvaca().forEach(function (a) {
+    // dichiarazione nei termini: solo l'ultimo anno (gli altri si aggiungono a mano)
+    var elenco = anniIvaca().slice().sort(function (x, y) { return x - y; });
+    if (ordinaria()) elenco = elenco.slice(-1);
+    elenco.forEach(function (a) {
       if (S.sanz.tolti[a] || S.sanz.anni.some(function (x) { return x.anno === a; })) return;
       var ini = saldiInizioAnno(a), fin = saldiFineAnno(a); if (!ini || !fin) return;
       var x = a >= 2023 ? calcolaAnno(a) : null;
@@ -659,7 +665,14 @@
     return S.sanz.anni.map(function (a) {
       var r = Z.calcolaAnno({ anno: a.anno, stato: a.stato, valoreRw: +a.valoreRw || 0, ivaca: +a.ivaca || 0, plusvalenze: plusvalenzeAnno(a), pagamento: S.sanz.pagamento,
         controlli: a.controlli || "nessuno", esteri: !!a.esteri, riduzione: !!a.riduzione, fraudolente: !!a.fraudolente, invio: a.invio || "" });
-      r.dati = a; return r;
+      r.dati = a;
+      if (ordinaria()) {
+        r = Z.calcolaAnno({ anno: a.anno, stato: "presentata", valoreRw: +a.valoreRw || 0, ivaca: +a.ivaca || 0, plusvalenze: plusvalenzeAnno(a), pagamento: S.sanz.pagamento, controlli: "nessuno" });
+        r.dati = a; r.ordinaria = true; r.ravvedibile = true; r.versioni = null; r.ravvedimentoValido = null;
+        r.voci = r.voci.map(function (v) { return Object.assign({}, v, { sanzione: 0, interessi: 0, frazione: null, calcolo: null }); });
+        r.sanzioni = 0; r.interessi = 0; r.totale = r.imposte;
+      }
+      return r;
     });
   }
   /* riduzione delle sanzioni dell'anno con il ravvedimento (es. «1/6: oltre il termine...»), in evidenza a video e in stampa */
@@ -670,8 +683,16 @@
     return { breve: f.testo.split(":")[0] + (f.lettera ? " (lett. " + f.lettera + ")" : ""), testo: "Sanzioni ridotte a " + f.testo + (f.lettera ? " (art. 13 c. 1 lett. " + f.lettera + " D.Lgs. 472/1997)" : "") };
   }
   function tabellaAnno(r) {
+    if (r.ordinaria) return tabellaImposte(r);
     var rid = riduzioneAnno(r);
     return '<p class="riduzione" style="margin:0 0 8px;padding:6px 10px;border-left:4px solid var(--gold);background:var(--ok-bg)"><b>Ravvedimento ' + r.anno + ":</b> " + esc(rid.testo) + ".</p>" + tabellaAnnoDettaglio(r);
+  }
+  /* dichiarazione nei termini: solo le imposte dell'anno, da versare a saldo */
+  function tabellaImposte(r) {
+    var righe = r.voci.filter(function (v) { return v.imposta; }).map(function (v) { return "<tr><td>" + esc(v.voce) + '</td><td class="n">' + E(v.imposta) + "</td></tr>"; }).join("");
+    return '<table class="det"><thead><tr><th>Imposta</th><th class="n">Importo</th></tr></thead><tbody>' + (righe || '<tr><td colspan="2" class="muted">Nessuna imposta dovuta</td></tr>') +
+      '<tr class="tot"><td>Totale imposte dell\'anno (saldo)</td><td class="n">' + E(r.imposte) + "</td></tr></tbody></table>" +
+      '<p class="small" style="margin:6px 0 0">Saldo ' + r.anno + " entro il " + D.it(r.termini.saldo) + ". RT: plusvalenze " + E(r.rt.plusvalenze) + (r.rt.franchigia ? " − franchigia " + E(r.rt.franchigia, 0) : "") + " × " + Math.round(r.rt.aliquota * 100) + "%. " + esc(r.rt.nota) + " Gli acconti dell\'anno successivo si calcolano a parte.</p>";
   }
   function tabellaAnnoDettaglio(r) {
     if (!r.ravvedibile) return tabellaVoci(r) +
@@ -715,6 +736,7 @@
       ". RT: plusvalenze " + E(r.rt.plusvalenze) + (r.rt.franchigia ? " − franchigia " + E(r.rt.franchigia, 0) : "") + " × " + Math.round(r.rt.aliquota * 100) + "%. " + esc(r.rt.nota) + "</p>";
   }
   function viewSanzioni() {
+    if (ordinaria()) return viewAnniOrdinaria();
     var Sz = S.sanz, calc = calcoliSanzioni();
     var h = '<h2>Sanzioni RW e RT</h2><p class="lead">Ravvedimento per cripto-attività non indicate nei quadri RW e RT: per ogni anno si applica la norma vigente quando la violazione è stata commessa (testo previgente o D.Lgs. 87/2024) e la riduzione che spetta alla data in cui si ravvede.</p>' +
       '<div class="panel"><div class="grid2"><label class="f"><span class="t">Data del ravvedimento (pagamento)</span><input type="date" data-sz="pagamento" value="' + esc(Sz.pagamento) + '"><span class="small">Determina la riduzione delle sanzioni e i giorni di interessi.</span></label>' +
@@ -733,6 +755,20 @@
           (Z.termini(a.anno).dichiarazione < "2024-09-01" ? '<label class="toggle"><input type="checkbox" data-za="' + a.id + '" data-k="esteri"' + (a.esteri ? " checked" : "") + '><span>Tesi prudenziale: aumento di 1/3 per redditi esteri (c. 8 previgente); per lo studio le cripto sono aterritoriali</span></label>' : "") +
         "</div>" +
         (a.stato !== "omessa" && Z.termini(a.anno).dichiarazione >= "2024-09-01" && Z.termini(a.anno).dichiarazione < "2025-09-01" ? '<label class="f"><span class="t">Dichiarazione originaria inviata il <span class="muted small">(facoltativo)</span></span><input type="date" data-za="' + a.id + '" data-k="invio" value="' + esc(a.invio || "") + '"><span class="small">Se inviata prima del 1/9/2024 si mostrano entrambe le discipline: il caso è dubbio.</span></label>' : "") +
+        campiAnno(a, err, ivDisp) +
+        '<div class="scroll" style="margin-top:10px">' + tabellaAnno(r) + "</div></div>";
+    }).join("");
+    var tot = calc.reduce(function (s, r) { return s + (r.totale || 0); }, 0), omesse = calc.filter(function (r) { return !r.ravvedibile; });
+    var ravv = calc.filter(function (r) { return r.ravvedibile; });
+    h += '<div class="cards" style="margin-top:14px">' + (ravv.length ? '<div class="card hl"><div class="k">Totale ravvedimento (imposte, sanzioni, interessi)</div><div class="v">' + E(ravv.reduce(function (s, r) { return s + r.totale; }, 0)) + "</div></div>" : "") +
+      (omesse.length ? '<div class="card"><div class="k">Anni non ravvedibili (omessa o avviso notificato): totale indicativo della versione principale</div><div class="v">' + E(omesse.reduce(function (s, r) { return s + r.totale; }, 0)) + "</div></div>" +
+        '<div class="card"><div class="k">Stessi anni con ravvedimento valido</div><div class="v">' + E(omesse.reduce(function (s, r) { return s + r.ravvedimentoValido.totale; }, 0)) + "</div></div>" : "") + "</div>" +
+      '<p class="metodi">Sanzione RW: 3% (minimo) del valore non dichiarato, art. 5 c. 2 DL 167/1990, ridotta con il ravvedimento. Imposte (IVACA e RT): sanzione per infedele dichiarazione ridotta, che assorbe quella per omesso versamento (circ. 42/E/2016), più interessi legali giorno per giorno dalla scadenza del saldo. Il ravvedimento è precluso dalla notifica di atti di liquidazione o accertamento (art. 13 c. 1-ter D.Lgs. 472/1997); con accessi, PVC o schema di atto le riduzioni cambiano. Disciplina applicata secondo la data di commissione della violazione (art. 5 D.Lgs. 87/2024): testo previgente fino al 31/8/2024, nuovo testo dal 1/9/2024. Dal 1/1/2027 entra in vigore il Testo unico sanzioni (D.Lgs. 173/2024): i riferimenti andranno aggiornati. I calcoli sono un supporto al professionista e vanno verificati sul caso concreto.</p>';
+    return h;
+  }
+  /* campi dell'anno comuni a dichiarazione nei termini e ravvedimento: report Koinly, valore RW, IVACA, RT */
+  function campiAnno(a, err, ivDisp) {
+    return (
         '<label class="f"><span class="t">Report Koinly dell\'anno</span><input type="file" accept=".pdf,.csv" data-zfile="' + a.id + '"><span class="small">' + (err ? '<span style="color:var(--hi)">' + esc(err) + "</span>" : a.nome ? esc(a.nome) : "Complete tax report (PDF) o End of year holdings (CSV)") + "</span></label>" +
         '<label class="f"><span class="t">Valore finale non dichiarato in RW <span class="muted small">(€)</span></span><input class="num" type="number" step="any" data-za="' + a.id + '" data-k="valoreRw" value="' + esc(a.valoreRw) + '"><span class="small">' + (a.fonte.valoreRw === "report" ? "Valore delle cripto al 31/12 dal report Koinly; modificabile (per esempio aggiungendo le cripto vendute nell'anno, al valore di fine detenzione)." : "Base della sanzione RW: valore finale delle cripto non dichiarate.") + "</span></label>" +
         '<label class="f"><span class="t">IVACA dovuta <span class="muted small">(€)</span></span><input class="num" type="number" step="any" data-za="' + a.id + '" data-k="ivaca" value="' + esc(a.anno < 2023 ? "" : a.ivaca) + '"' + (a.anno < 2023 ? " disabled" : "") + '><span class="small">' + (a.anno < 2023 ? "Non dovuta prima del 2023." : ivDisp != null ? '<button type="button" class="btnlink" data-usaivaca="' + a.id + '">Usa l\'IVACA calcolata nella prima pagina: ' + E(ivDisp) + "</button>" : "Dalla prima pagina (giorni di detenzione) per lo stesso anno, o a mano.") + "</span></label>" +
@@ -750,15 +786,23 @@
           return a.redditi ? '<div class="f"><span class="t">Altri redditi del report</span><span class="small">Il report indica anche ' + E(a.redditi) + " di interessi, reward e airdrop: fino al 2022 non rientrano nel quadro RT delle cripto, valutarne la qualificazione.</span></div>" : "";
         })() +
         '<div class="f"><span class="t">Plusvalenze nette RT <span class="muted small">(€)</span></span><div class="v" style="font:600 1.1rem var(--f-mono)">' + E(plusvalenzeAnno(a)) + '</div><span class="small">Corrispettivi delle vendite' + (rtAnno(a).proventi ? " + proventi" : "") + " − costi di acquisto · fonte: " + esc(rtAnno(a).fonte) + ".</span></div>" +
-        "</div>" + (a.avvisi && a.avvisi.length ? '<p class="small" style="color:var(--mid)">' + a.avvisi.map(esc).join("<br>") + "</p>" : "") +
-        '<div class="scroll" style="margin-top:10px">' + tabellaAnno(r) + "</div></div>";
+        "</div>" + (a.avvisi && a.avvisi.length ? '<p class="small" style="color:var(--mid)">' + a.avvisi.map(esc).join("<br>") + "</p>" : ""));
+  }
+  /* dichiarazione nei termini: gli anni da dichiarare con valori e imposte, senza sanzioni né ravvedimento */
+  function viewAnniOrdinaria() {
+    var Sz = S.sanz, calc = calcoliSanzioni();
+    var h = '<h2>Imposte dell\'anno</h2><p class="lead">Dichiarazione presentata nei termini: per ogni anno il valore del quadro RW, l\'IVACA e le plusvalenze del quadro RT, con le imposte da versare a saldo. Sanzioni e ravvedimento non si applicano.</p>' +
+      '<div class="panel"><div class="f"><span class="t">Anni da dichiarare</span><div class="toolbar"><button type="button" class="btn" id="aggiungiAnno">Aggiungi un anno</button>' + (calc.length ? '<button type="button" class="btn ghost" data-tab="' + VISTE.indexOf("riepilogo") + '">Vai al fascicolo fiscale</button>' : "") + "</div></div></div>";
+    if (!calc.length) return h + '<p class="muted" style="margin-top:14px">Aggiungete l\'anno da dichiarare e caricate il «Complete tax report» Koinly di quell\'anno (o il report dei saldi di fine anno): valore finale e plusvalenze si compilano da lì.</p>';
+    h += calc.map(function (r) {
+      var a = r.dati;
+      return '<div class="panel" style="margin-top:14px"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Anno ' + a.anno + (a.automatico ? ' <span class="small muted">· inserito dai file caricati</span>' : "") + '</h3><button type="button" class="btnlink small" data-toglianno="' + a.id + '">Togli l\'anno</button></div>' +
+        '<div class="grid2" style="margin-top:10px">' +
+        '<label class="f"><span class="t">Anno d\'imposta</span><select data-za="' + a.id + '" data-k="anno">' + [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026].map(function (y) { return "<option" + (y === a.anno ? " selected" : "") + ">" + y + "</option>"; }).join("") + "</select></label>" +
+        campiAnno(a, Sz.errore[a.id], ivacaDisponibile(a.anno)).replace("Valore finale non dichiarato in RW", "Valore finale in RW").replace("Base della sanzione RW: valore finale delle cripto non dichiarate.", "Valore finale delle cripto al 31/12.") +
+        '<div class="scroll" style="margin-top:10px">' + tabellaImposte(r) + "</div></div>";
     }).join("");
-    var tot = calc.reduce(function (s, r) { return s + (r.totale || 0); }, 0), omesse = calc.filter(function (r) { return !r.ravvedibile; });
-    var ravv = calc.filter(function (r) { return r.ravvedibile; });
-    h += '<div class="cards" style="margin-top:14px">' + (ravv.length ? '<div class="card hl"><div class="k">Totale ravvedimento (imposte, sanzioni, interessi)</div><div class="v">' + E(ravv.reduce(function (s, r) { return s + r.totale; }, 0)) + "</div></div>" : "") +
-      (omesse.length ? '<div class="card"><div class="k">Anni non ravvedibili (omessa o avviso notificato): totale indicativo della versione principale</div><div class="v">' + E(omesse.reduce(function (s, r) { return s + r.totale; }, 0)) + "</div></div>" +
-        '<div class="card"><div class="k">Stessi anni con ravvedimento valido</div><div class="v">' + E(omesse.reduce(function (s, r) { return s + r.ravvedimentoValido.totale; }, 0)) + "</div></div>" : "") + "</div>" +
-      '<p class="metodi">Sanzione RW: 3% (minimo) del valore non dichiarato, art. 5 c. 2 DL 167/1990, ridotta con il ravvedimento. Imposte (IVACA e RT): sanzione per infedele dichiarazione ridotta, che assorbe quella per omesso versamento (circ. 42/E/2016), più interessi legali giorno per giorno dalla scadenza del saldo. Il ravvedimento è precluso dalla notifica di atti di liquidazione o accertamento (art. 13 c. 1-ter D.Lgs. 472/1997); con accessi, PVC o schema di atto le riduzioni cambiano. Disciplina applicata secondo la data di commissione della violazione (art. 5 D.Lgs. 87/2024): testo previgente fino al 31/8/2024, nuovo testo dal 1/9/2024. Dal 1/1/2027 entra in vigore il Testo unico sanzioni (D.Lgs. 173/2024): i riferimenti andranno aggiornati. I calcoli sono un supporto al professionista e vanno verificati sul caso concreto.</p>';
+    h += '<div class="cards" style="margin-top:14px"><div class="card hl"><div class="k">Imposte da versare a saldo (IVACA e RT)</div><div class="v">' + E(calc.reduce(function (s, r) { return s + r.imposte; }, 0)) + "</div></div></div>";
     return h;
   }
   function stampaSanzioni() {
@@ -789,10 +833,16 @@
       { quadro: "Altre sanzioni", prova: function () { return true; }, base: "" }];
     gruppi.forEach(function (g) { g.imposte = 0; g.sanzioni = 0; g.interessi = 0; g.n = 0; });
     r.voci.forEach(function (v) { var g = gruppi.filter(function (x) { return x.prova(v); })[0]; g.imposte += v.imposta || 0; g.sanzioni += v.sanzione || 0; g.interessi += v.interessi || 0; g.n++; });
-    return gruppi.filter(function (g) { return g.n && (g.imposte || g.sanzioni || g.interessi); }).map(function (g) { g.totale = g.imposte + g.sanzioni + g.interessi; return g; });
+    return gruppi.filter(function (g) { return g.n && (g.imposte || g.sanzioni || g.interessi || (r.ordinaria && /monitoraggio/.test(g.quadro))); }).map(function (g) { g.totale = g.imposte + g.sanzioni + g.interessi; return g; });
   }
   function tabellaRiepilogo(calc) {
     var tot = function (k) { return calc.reduce(function (s, r) { return s + (r[k] || 0); }, 0); };
+    if (ordinaria()) return '<table class="det"><thead><tr><th>Anno</th><th>Quadro</th><th class="n">Base</th><th class="n">Imposta</th></tr></thead><tbody>' +
+      calc.map(function (r) {
+        var righi = righiRiepilogoAnno(r);
+        return righi.map(function (g, i) { return "<tr><td>" + (i ? "" : r.anno) + "</td><td>" + esc(g.quadro) + '</td><td class="n">' + esc(g.base) + '</td><td class="n">' + (g.imposte ? E(g.imposte) : "–") + "</td></tr>"; }).join("") +
+          (righi.length > 1 ? '<tr style="font-weight:600"><td></td><td>Totale ' + r.anno + '</td><td></td><td class="n">' + E(r.imposte) + "</td></tr>" : "");
+      }).join("") + '<tr class="tot"><td>Totale</td><td colspan="2"></td><td class="n">' + E(tot("imposte")) + "</td></tr></tbody></table>";
     var celle = function (x) { return '<td class="n">' + E(x.imposte) + '</td><td class="n">' + E(x.sanzioni) + '</td><td class="n">' + E(x.interessi) + '</td><td class="n">' + E(x.totale) + "</td>"; };
     return '<table class="det"><thead><tr><th>Anno</th><th>Quadro</th><th class="n">Base</th><th>Riduzione sanzioni</th><th class="n">Imposte</th><th class="n">Sanzioni</th><th class="n">Interessi</th><th class="n">Totale</th></tr></thead><tbody>' +
       calc.map(function (r) {
@@ -809,17 +859,18 @@
       var x = r.anno === S.anno && ivaca ? true : !!calcolaAnno(r.anno), q = altri.filter(function (z) { return z.anno === r.anno; })[0];
       var voci = [["Giorni di detenzione, " + (r.anno >= 2023 ? "IVACA" : "valori per il monitoraggio") + " e quadro RW", x, "transazioni e saldi di inizio e fine " + r.anno]];
       if (r.anno <= 2022) voci.push(["Soglia delle valute (51.645,69 € per 7 giorni lavorativi)", x, "transazioni e saldi di inizio e fine " + r.anno]);
-      voci.push(["Quadro RT delle cripto-attività", true, ""], ["Quadro RT al 26% e quadro RM degli altri redditi (broker esteri)", !!q, "nessun altro reddito inserito (facoltativo)"], ["Sanzioni RW e RT e ravvedimento: " + riduzioneAnno(r).breve, true, ""]);
+      voci.push(["Quadro RT delle cripto-attività", true, ""], ["Quadro RT al 26% e quadro RM degli altri redditi (broker esteri)", !!q, "nessun altro reddito inserito (facoltativo)"], r.ordinaria ? ["Imposte dell'anno e F24 di saldo", true, ""] : ["Sanzioni RW e RT e ravvedimento: " + riduzioneAnno(r).breve, true, ""]);
       return "<tr><td>" + r.anno + "</td><td>" + voci.map(function (v) { return (v[1] ? '<span class="sem verde">sì</span> ' : '<span class="sem giallo">no</span> ') + esc(v[0]) + (v[1] ? "" : ' <span class="small muted">(' + esc(v[2]) + ")</span>"); }).join("<br>") + "</td></tr>";
     }).join("");
   }
   function viewRiepilogo() {
     var calc = calcoliFascicolo();
-    var h = '<h2>Fascicolo fiscale</h2><p class="lead">Ultima fase. Dopo aver caricato i file e controllato giorni di detenzione, quadri e sanzioni nelle schede precedenti, qui si stampa il <b>fascicolo completo per il contribuente</b>: riepilogo; per ogni anno giorni di detenzione, quadro RW, quadro RT, eventuale quadro RM, sanzioni e ravvedimento; modello F24; il lavoro svolto per il contribuente e, in fondo, la metodologia utilizzata per arrivare ai risultati.</p>';
-    if (!calc.length) return h + '<div class="panel"><p class="muted" style="margin:0">Il fascicolo si costruisce dagli anni della scheda <button type="button" class="btnlink" data-tab="' + VISTE.indexOf("sanzioni") + '">Sanzioni RW, RT e RM</button>: aggiungete gli anni da dichiarare o ravvedere.</p></div>';
-    h += '<div class="panel"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Riepilogo per anno · ravvedimento al ' + D.it(S.sanz.pagamento) + '</h3><button type="button" class="btn gold" id="stampaCompleta">Stampa fascicolo</button></div><div class="scroll" style="margin-top:10px">' + tabellaRiepilogo(calc) + "</div></div>";
+    var ord = ordinaria();
+    var h = '<h2>Fascicolo fiscale</h2><p class="lead">Ultima fase. Dopo aver caricato i file e controllato giorni di detenzione e quadri' + (ord ? "" : " e sanzioni") + ' nelle schede precedenti, qui si stampa il <b>fascicolo completo per il contribuente</b>: riepilogo; per ogni anno giorni di detenzione, quadro RW, quadro RT, eventuale quadro RM, ' + (ord ? "imposte dell\'anno" : "sanzioni e ravvedimento") + '; modello F24' + (ord ? " di saldo" : "") + '; il lavoro svolto per il contribuente e, in fondo, la metodologia utilizzata per arrivare ai risultati.</p>';
+    if (!calc.length) return h + '<div class="panel"><p class="muted" style="margin:0">Il fascicolo si costruisce dagli anni della scheda <button type="button" class="btnlink" data-tab="' + VISTE.indexOf("sanzioni") + '">' + (ord ? "Quadri RW, RT e F24" : "Quadri RW, RT, F24 e sanzioni") + '</button>: aggiungete gli anni ' + (ord ? "da dichiarare" : "da ravvedere") + '.</p></div>';
+    h += '<div class="panel"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Riepilogo per anno · ' + (ord ? "imposte da versare a saldo" : "ravvedimento al " + D.it(S.sanz.pagamento)) + '</h3><button type="button" class="btn gold" id="stampaCompleta">Stampa fascicolo</button></div><div class="scroll" style="margin-top:10px">' + tabellaRiepilogo(calc) + "</div></div>";
     h += '<div class="panel" style="margin-top:14px"><h3 style="margin-top:0">Contenuto del fascicolo</h3><p class="small">Oltre a quanto indicato per ogni anno: dati del contribuente (scheda dei quadri), riepilogo, modello F24 e metodologia dei calcoli.</p><table class="det"><thead><tr><th>Anno</th><th>Sezioni</th></tr></thead><tbody>' + contenutoFascicolo(calc) + "</tbody></table>" +
-      '<p class="small">Le sanzioni sono calcolate sulle imposte dei quadri RW (IVACA) e RT delle cripto-attività. Le imposte del quadro RM e della sezione al 26% degli altri redditi entrano nel fascicolo come quadri, ma non nel calcolo delle sanzioni.</p></div>';
+      (ord ? '<p class="small">Imposte dei quadri RW (IVACA) e RT delle cripto-attività. Le imposte del quadro RM e della sezione al 26% degli altri redditi entrano nel fascicolo come quadri.</p></div>' : '<p class="small">Le sanzioni sono calcolate sulle imposte dei quadri RW (IVACA) e RT delle cripto-attività. Le imposte del quadro RM e della sezione al 26% degli altri redditi entrano nel fascicolo come quadri, ma non nel calcolo delle sanzioni.</p></div>');
     return h;
   }
   /* il lavoro svolto in concreto per il contribuente: file ricevuti, numeri di ogni anno, verifiche, correzioni ed esito */
@@ -831,7 +882,7 @@
     var intro = S.tx ? "Abbiamo ricevuto e caricato l'esportazione delle transazioni dal software Koinly (" + mov.length.toLocaleString("it-IT") + " operazioni dal " + it(D.giorno(mov[0].ts, S.fuso)) + " al " + it(D.giorno(mov[mov.length - 1].ts, S.fuso)) + (nw ? ", su " + nw + " wallet ed exchange" : "") + ")" +
       (S.saldiFile.length ? " e i report Koinly dei saldi al " + S.saldiFile.map(function (z) { return it(z.data); }).join(", al ") : "") + ". "
       : "Abbiamo lavorato sui report Koinly e sui dati forniti, senza l'esportazione delle transazioni. ";
-    intro += "Abbiamo ricostruito, per " + (calc.length === 1 ? "l'anno " : "gli anni ") + calc.map(function (r) { return r.anno; }).join(", ") + ", i periodi di detenzione e i valori da indicare nel quadro RW, i costi di carico e le plusvalenze del quadro RT, e abbiamo calcolato imposte, sanzioni e interessi per la regolarizzazione con il ravvedimento al " + D.it(S.sanz.pagamento) + ".";
+    intro += "Abbiamo ricostruito, per " + (calc.length === 1 ? "l'anno " : "gli anni ") + calc.map(function (r) { return r.anno; }).join(", ") + ", i periodi di detenzione e i valori da indicare nel quadro RW, i costi di carico e le plusvalenze del quadro RT, e abbiamo calcolato " + (ordinaria() ? "le imposte da versare a saldo con la dichiarazione." : "imposte, sanzioni e interessi per la regolarizzazione con il ravvedimento al " + D.it(S.sanz.pagamento) + ".");
     if (ncorr) intro += " Sulle operazioni che Koinly non classifica in modo certo (prelievi e depositi verso wallet non collegati) lo studio ha fatto " + ncorr + (ncorr === 1 ? " correzione" : " correzioni") + ", documentate nel prospetto dei costi di carico.";
     h += "<p>" + intro + "</p>";
     calc.forEach(function (r) {
@@ -846,7 +897,7 @@
       }
       var rt = rtAnno(a), pl = plusvalenzeAnno(a);
       voci.push("Quadro RT: corrispettivi " + E(rt.corrispettivi, 0) + ", costi " + E(rt.costi, 0) + ": " + (pl >= 0 ? "plusvalenza " + E(pl, 0) : "minusvalenza " + E(-pl, 0)) + " (fonte: " + esc(rt.fonte) + ").");
-      voci.push("Ravvedimento: " + esc(riduzioneAnno(r).testo) + ". Imposte " + E(r.imposte) + ", sanzioni " + E(r.sanzioni) + ", interessi " + E(r.interessi) + ", totale " + E(r.totale) + ".");
+      voci.push(r.ordinaria ? "Imposte dell'anno da versare a saldo: " + E(r.imposte) + "." : "Ravvedimento: " + esc(riduzioneAnno(r).testo) + ". Imposte " + E(r.imposte) + ", sanzioni " + E(r.sanzioni) + ", interessi " + E(r.interessi) + ", totale " + E(r.totale) + ".");
       h += "<h3>Anno " + r.anno + "</h3><ul>" + voci.map(function (v) { return "<li>" + v + "</li>"; }).join("") + "</ul>";
     });
     return h;
@@ -868,7 +919,7 @@
     h += P(T("Costi di carico"), "I costi sono ricostruiti dall'origine, dalla prima operazione registrata, con una pila di strati per ogni cripto unica per tutti i wallet e tutti gli anni (LIFO globale): ogni cessione scarica per prima la quantità acquistata più di recente. Acquisti: costo pagato con le commissioni. Permute: valore del momento. Interessi, reward, airdrop e cashback: valore del giorno di ricezione. Commissioni: oneri accessori, nel costo di ciò che si riceve o in riduzione del corrispettivo; quelle in cripto fino al 2022 sono cessioni al valore del momento. Trasferimenti tra wallet propri: nessun effetto." + (post.length ? " Dal 2023 permute tra cripto, acquisti con stablecoin e scambi tra stablecoin non realizzano (art. 67 c. 1 lett. c-sexies TUIR): la cripto ricevuta prende il costo di quella ceduta." : ""));
     if (pre.length) h += P(T("Anni fino al 2022: regime delle valute e soglia"), "Fino al 2022 le cripto seguono il regime delle valute (art. 67 c. 1 lett. c-ter e c. 1-ter TUIR). La condizione è annuale: se in un qualunque momento dell'anno la giacenza complessiva di tutti i wallet e di tutte le cripto, valutata al prezzo del 1° gennaio dell'anno, supera 51.645,69 € per almeno 7 giorni lavorativi continui (esclusi sabati, domeniche, festivi e Pasquetta), tutte le cessioni dell'anno sono rilevanti, anche quelle fatte quando la giacenza era sotto la soglia; altrimenti nessuna. Prezzi al 1/1 dal report di inizio anno; per le cripto che non vi compaiono, prezzo della prima transazione dell'anno, indicato come stimato. Se la condizione è verificata, plusvalenze e minusvalenze di tutte le cessioni vanno nel quadro RT, sezione dei redditi diversi al 26% (righi RT21-RT29), e l'imposta si versa con il codice 1100.");
     if (post.length) h += P(T("Anni dal 2023: quadro RT delle cripto-attività"), "Plusvalenza = corrispettivi − costi delle cessioni rilevanti (vendite contro valuta e contro stablecoin) più i proventi da detenzione (staking, reward, airdrop, interessi) a costo zero. Franchigia di 2.000 € per il 2023 e il 2024 (si tassa la parte che eccede), nessuna dal 2025. Imposta sostitutiva del 26% (codice 1715).");
-    h += P(T("Sanzioni e ravvedimento"), "Per ogni anno si applica la disciplina vigente quando la violazione è stata commessa (art. 5 D.Lgs. 87/2024): testo previgente per le dichiarazioni con termine fino al 31/8/2024, testo modificato per quelle successive. Quadro RW: 3% del valore non dichiarato (art. 5 c. 2 DL 167/1990). Imposte (IVACA e RT): sanzione per infedele dichiarazione (art. 1 D.Lgs. 471/1997), che assorbe quella per omesso versamento (circ. 42/E/2016). Le sanzioni sono ridotte secondo la data del ravvedimento (" + D.it(S.sanz.pagamento) + ", art. 13 D.Lgs. 472/1997): " +
+    if (!ordinaria()) h += P(T("Sanzioni e ravvedimento"), "Per ogni anno si applica la disciplina vigente quando la violazione è stata commessa (art. 5 D.Lgs. 87/2024): testo previgente per le dichiarazioni con termine fino al 31/8/2024, testo modificato per quelle successive. Quadro RW: 3% del valore non dichiarato (art. 5 c. 2 DL 167/1990). Imposte (IVACA e RT): sanzione per infedele dichiarazione (art. 1 D.Lgs. 471/1997), che assorbe quella per omesso versamento (circ. 42/E/2016). Le sanzioni sono ridotte secondo la data del ravvedimento (" + D.it(S.sanz.pagamento) + ", art. 13 D.Lgs. 472/1997): " +
       calc.map(function (r) { return r.anno + " " + esc(riduzioneAnno(r).breve); }).join("; ") + ". Interessi al tasso legale di ciascun anno, giorno per giorno dalla scadenza del saldo al versamento.");
     h += P(T("Prezzi e valori di mercato"), "I prezzi e i controvalori in euro sono quelli determinati da Koinly: per ogni operazione il valore medio di mercato rilevato, al momento dell'operazione, sulle diverse piattaforme di scambio da cui Koinly acquisisce le quotazioni, salvo che il prezzo sia fornito direttamente dalla piattaforma su cui è avvenuta l'operazione. Gli stessi criteri valgono per i valori di inizio e fine anno dei report dei saldi." + (Object.keys(S.correzioni || {}).length ? " Su questi valori si innestano le correzioni dello studio indicate nel lavoro svolto." : ""));
     return h;
@@ -878,8 +929,8 @@
   function stampaFascicolo() {
     var calc = calcoliFascicolo(), altri = quadriAltri();
     var h = intestazione("Fascicolo cripto-attività · anni " + calc.map(function (r) { return r.anno; }).join(", ")) + datiContribuente() +
-      '<table class="dati"><tr><td>Data del ravvedimento</td><td>' + D.it(S.sanz.pagamento) + "</td></tr>" + (S.tx ? "<tr><td>Transazioni</td><td>" + esc(S.tx.nome) + "</td></tr>" : "") + "</table>" +
-      "<h2>Riepilogo</h2>" + tabellaRiepilogo(calc) + '<p class="small">Il fascicolo contiene, per ogni anno, giorni di detenzione, quadro RW, quadro RT, sanzioni e ravvedimento; poi il modello F24, il lavoro svolto per il contribuente e, in fondo, la metodologia utilizzata per arrivare a questi risultati.</p>';
+      '<table class="dati">' + (ordinaria() ? "" : "<tr><td>Data del ravvedimento</td><td>" + D.it(S.sanz.pagamento) + "</td></tr>") + (S.tx ? "<tr><td>Transazioni</td><td>" + esc(S.tx.nome) + "</td></tr>" : "") + "</table>" +
+      "<h2>Riepilogo</h2>" + tabellaRiepilogo(calc) + '<p class="small">Il fascicolo contiene, per ogni anno, giorni di detenzione, quadro RW, quadro RT, ' + (ordinaria() ? "imposte dell\'anno" : "sanzioni e ravvedimento") + '; poi il modello F24, il lavoro svolto per il contribuente e, in fondo, la metodologia utilizzata per arrivare a questi risultati.</p>';
     calc.forEach(function (r) {
       var a = r.dati, x = r.anno === S.anno && ivaca ? { calcolo: calcolo, ivaca: ivaca, soglia: sogliaV } : calcolaAnno(r.anno);
       h += '<h2 class="anno">Anno ' + r.anno + "</h2>";
@@ -895,12 +946,12 @@
       h += "<h3>Quadro RT · cripto-attività</h3>" + tabellaRT(a).replace(/^<h4>[^]*?<\/h4>/, "");
       var qa = altri.filter(function (z) { return z.anno === r.anno; })[0];
       if (qa) h += "<h3>Quadri RT al 26% e RM · altri redditi</h3>" + tabellaAltri(qa).replace(/<h4>/g, "<h4 class=\"small\">");
-      h += "<h3>Sanzioni RW e RT e ravvedimento</h3>" + tabellaAnno(r);
+      h += "<h3>" + (r.ordinaria ? "Imposte dell'anno" : "Sanzioni RW e RT e ravvedimento") + "</h3>" + tabellaAnno(r);
     });
     // altri redditi di anni senza sanzioni
     altri.filter(function (z) { return !calc.some(function (r) { return r.anno === z.anno; }); }).forEach(function (z) { h += '<h2 class="anno">Anno ' + z.anno + " · altri redditi</h2>" + tabellaAltri(z); });
     var f = MOD.f24(calc);
-    if (f.righe.length) h += "<h2>Modello F24 · sezione Erario</h2>" + tabellaF24(f);
+    if (f.righe.length) h += "<h2>Modello F24 " + (ordinaria() ? "di saldo " : "") + "· sezione Erario</h2>" + tabellaF24(f);
     h += lavoroSvolto(calc) + '<div class="metodo-fascicolo">' + metodologia(calc) + "</div>" + firma();
     apriStampa(h);
   }
@@ -1542,18 +1593,18 @@
     }
     // quadro RT: dagli anni della pagina Sanzioni (corrispettivi e costi)
     h += '<div class="panel" style="margin-top:14px"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Quadro RT · cripto-attività</h3>' + (S.sanz.anni.length ? '<button type="button" class="btn gold" id="stampaRT">Stampa / PDF quadro RT</button>' : "") + "</div>";
-    h += S.sanz.anni.length ? S.sanz.anni.map(function (a) { return tabellaRT(a); }).join("") : '<p class="muted">Il quadro RT si compila dagli anni inseriti nella pagina Sanzioni (corrispettivi delle vendite e costi di acquisto).</p>';
+    h += S.sanz.anni.length ? S.sanz.anni.map(function (a) { return tabellaRT(a); }).join("") : '<p class="muted">Il quadro RT si compila dagli anni inseriti in questa scheda, qui sotto (corrispettivi delle vendite e costi di acquisto).</p>';
     h += "</div>";
     h += pannelloReport();
     h += pannelloAltri();
     h += sezioneEtoro();
-    if (S.percorso === "dichiarazione") h += S.tx ? sezioneProvenienza({ anni: anniCosti().filter(function (a) { return a >= 2017; }) }, false) : '<div class="panel" style="margin-top:14px"><h3 style="margin-top:0">Verifica della provenienza dei fondi</h3><p class="muted">Caricate le transazioni Koinly e le dichiarazioni dei redditi nella scheda <button type="button" class="btnlink" data-tab="1">Caricamento file</button>.</p></div>';
+    if (S.percorso === "ordinaria" || S.percorso === "ravvedimento") h += S.tx ? sezioneProvenienza({ anni: anniCosti().filter(function (a) { return a >= 2017; }) }, false) : '<div class="panel" style="margin-top:14px"><h3 style="margin-top:0">Verifica della provenienza dei fondi</h3><p class="muted">Caricate le transazioni Koinly e le dichiarazioni dei redditi nella scheda <button type="button" class="btnlink" data-tab="1">Caricamento file</button>.</p></div>';
     h += S.broker.map(sezioneBroker).join("");
     // F24
     var f = MOD.f24(calcoliSanzioni());
-    h += '<div class="panel" style="margin-top:14px"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Modello F24 · ravvedimento</h3>' + (f.righe.length ? '<div class="toolbar"><button type="button" class="btn gold" id="stampaF24">Stampa / PDF modello F24</button><button type="button" class="btn ghost" data-tab="' + VISTE.indexOf("riepilogo") + '">Vai al fascicolo finale</button></div>' : "") + "</div>" +
+    h += '<div class="panel" style="margin-top:14px"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Modello F24 · ' + (ordinaria() ? "saldo" : "ravvedimento") + '</h3>' + (f.righe.length ? '<div class="toolbar"><button type="button" class="btn gold" id="stampaF24">Stampa / PDF modello F24</button><button type="button" class="btn ghost" data-tab="' + VISTE.indexOf("riepilogo") + '">Vai al fascicolo finale</button></div>' : "") + "</div>" +
       '<div class="grid2" style="margin:10px 0"><label class="f"><span class="t">Codice fiscale del contribuente</span><input type="text" data-modt="cf" value="' + esc(S.modelli.cf || "") + '" maxlength="16" autocomplete="off"></label><label class="f"><span class="t">Cognome e nome</span><input type="text" data-modt="nome" value="' + esc(S.modelli.nome || "") + '" autocomplete="off"></label></div>' +
-      (f.righe.length ? tabellaF24(f) : '<p class="muted">L\'F24 si compila dai ravvedimenti della pagina Sanzioni.</p>') + "</div>";
+      (f.righe.length ? tabellaF24(f) : '<p class="muted">' + (ordinaria() ? "L\'F24 si compila dalle imposte degli anni inseriti qui sotto." : "L\'F24 si compila dai ravvedimenti degli anni inseriti qui sotto.") + "</p>") + "</div>";
     return h;
   }
   /* ---------- altri report Koinly (Income, Expenses, Gifts/Lost, Other gains): solo informazioni, non entrano nei calcoli ---------- */
@@ -1675,9 +1726,10 @@
   function tabellaF24(f) {
     return '<table class="det f24"><thead><tr><th>Sezione</th><th>Codice tributo</th><th>Rateazione / mese rif.</th><th>Anno di riferimento</th><th class="n">Importi a debito versati</th><th>Voce</th></tr></thead><tbody>' +
       f.righe.map(function (x) { return "<tr><td>Erario</td><td><b>" + x.codice + "</b></td><td>" + (x.rateazione || "") + "</td><td>" + x.anno + '</td><td class="n">' + E(x.importo) + "</td><td class=\"small\">" + esc(x.descrizione) + "</td></tr>"; }).join("") +
-      '<tr class="tot"><td colspan="4">Totale (saldo) · data di versamento ' + D.it(S.sanz.pagamento) + '</td><td class="n">' + E(f.totale) + "</td><td></td></tr></tbody></table>" +
+      '<tr class="tot"><td colspan="4">Totale (saldo)' + (ordinaria() ? "" : " · data di versamento " + D.it(S.sanz.pagamento)) + '</td><td class="n">' + E(f.totale) + "</td><td></td></tr></tbody></table>" +
       (f.esclusi.length ? '<p class="small" style="color:var(--hi)">Anni con dichiarazione omessa non inseriti (' + f.esclusi.join(", ") + "): ravvedimento non possibile (dichiarazione omessa o avviso notificato). Le sanzioni della versione principale si versano con i codici da verificare.</p>" : "") +
-      '<p class="small">Codici: 1727 imposta sulle cripto-attività, saldo (Ris. 36/E/2023 e 10/E/2024); 1715 imposta sostitutiva su plusvalenze da cripto-attività, quadro RT (Ris. 36/E/2023); 8945 sanzione e 1945 interessi da ravvedimento su imposte sui redditi e sostitutive (Ris. 12/E/2023: per l\'imposta sulle cripto-attività in assenza di codici specifici); 8911 sanzioni per altre violazioni (quadro RW, dichiarazione tardiva). Anno di riferimento: anno d\'imposta. Codici da ricontrollare prima del versamento.</p>';
+      (ordinaria() ? '<p class="small">Codici: 1727 imposta sulle cripto-attività, saldo (Ris. 36/E/2023 e 10/E/2024); 1715 imposta sostitutiva su plusvalenze da cripto-attività, quadro RT (Ris. 36/E/2023); 1100 imposta sostitutiva dei redditi diversi (fino al 2022). Anno di riferimento: anno d\'imposta. Gli acconti dell\'anno successivo non sono compresi. Codici da ricontrollare prima del versamento.</p>' :
+      '<p class="small">Codici: 1727 imposta sulle cripto-attività, saldo (Ris. 36/E/2023 e 10/E/2024); 1715 imposta sostitutiva su plusvalenze da cripto-attività, quadro RT (Ris. 36/E/2023); 8945 sanzione e 1945 interessi da ravvedimento su imposte sui redditi e sostitutive (Ris. 12/E/2023: per l\'imposta sulle cripto-attività in assenza di codici specifici); 8911 sanzioni per altre violazioni (quadro RW, dichiarazione tardiva). Anno di riferimento: anno d\'imposta. Codici da ricontrollare prima del versamento.</p>');
   }
   function datiContribuente() { return '<table class="dati"><tr><td>Contribuente</td><td>' + esc(S.modelli.nome || "________________") + "</td></tr><tr><td>Codice fiscale</td><td>" + esc(S.modelli.cf || "________________") + "</td></tr></table>"; }
   function stampaRT() {
@@ -1685,7 +1737,7 @@
   }
   function stampaF24() {
     var f = MOD.f24(calcoliSanzioni());
-    apriStampa(intestazione("Modello F24 · ravvedimento cripto-attività") + datiContribuente() + "<h2>Sezione Erario</h2>" + tabellaF24(f) + firma());
+    apriStampa(intestazione("Modello F24 · " + (ordinaria() ? "saldo" : "ravvedimento") + " cripto-attività") + datiContribuente() + "<h2>Sezione Erario</h2>" + tabellaF24(f) + firma());
   }
   function stampaRW() {
     var q = MOD.quadroRW(ivaca, { titolo: S.modelli.titolo, sogliaPeriodi: S.modelli.sogliaPeriodi });
