@@ -51,6 +51,41 @@ t("ledger: scambi, acquisti rapidi, staking, interni, prelievi, margine", () => 
   assert.equal(new Date(sc.ts).toISOString(), "2021-03-02T11:00:00.000Z");
 });
 
+const CSV2 = '"txid","refid","time","type","subtype","aclass","asset","wallet","amount","fee","balance"\n' +
+  // il file parte con 5 SOL già sul conto
+  '"A1","Q1","2024-01-02 10:00:00","earn","reward","currency","SOL","earn / liquid",0.1000,0.0250,5.0750\n' +
+  // acquisto rapido con refid diversi per spend e receive
+  '"A2","TSAAA1","2024-01-03 18:44:28","spend","","currency","ZEUR","spot / main",-200.0000,3.0000,100\n' +
+  '"A3","TSBBB2","2024-01-03 18:44:28","receive","","currency","GALA","spot / main",9448.13,0,9448.13\n' +
+  // prelievo annullato: stessa refid, segni opposti
+  '"A4","FTX1","2024-01-31 15:02:38","withdrawal","","currency","GALA","spot / main",-200,80,9168.13\n' +
+  '"A5","FTX1","2024-01-31 15:06:29","withdrawal","","currency","GALA","spot / main",200,-80,9448.13\n' +
+  // residui: due cripto cedute per un solo EUR
+  '"A6","DS1","2024-02-01 09:00:00","spend","dustsweeping","currency","ADA","spot / main",-0.5,0,0\n' +
+  '"A7","DS1","2024-02-01 09:00:00","spend","dustsweeping","currency","DOT","spot / main",-0.1,0,0\n' +
+  '"A8","DS1","2024-02-01 09:00:00","receive","dustsweeping","currency","ZEUR","spot / main",1.0000,0,101\n' +
+  // delisting: USDT → USDC con refid diversi
+  '"A9","TRM1","2025-03-31 16:33:09","transfer","delistingconversion","currency","USDT","earn / liquid",-0.4655,0,0\n' +
+  '"A10","TRM2","2025-04-01 06:11:33","transfer","delistingconversion","currency","USDC","spot / main",0.4652,0,0.4652\n' +
+  '"A11","FUT1","2025-05-01 10:00:00","transfer","spotfromfutures","currency","ETHW","spot / main",0.0000099,0,0.0000099\n' +
+  '"A12","Unknown","2025-06-06 00:49:12","reward","welcomebonus","currency","XXBT","spot / main",0.0000946,0,0.0000946\n';
+
+t("ledger reale: ricompense nette, refid diversi, storni, residui, delisting, Futures, saldo iniziale", () => {
+  const r = P.leggiKraken(CSV2), m = r.movimenti;
+  const rw = m.filter((x) => x.tag === "reward")[0]; assert.equal(qn(voce(rw, "a").q), 0.075);
+  const ar = m.filter((x) => x.tipo === "trade" && voce(x, "a").simbolo === "GALA")[0];
+  assert.equal(voce(ar, "da").simbolo, "EUR"); assert.equal(qn(voce(ar, "fee").q), -3); assert.equal(ar.valore, 200);
+  assert.equal(m.filter((x) => voce(x, "da") && voce(x, "da").simbolo === "GALA").length, 0); // prelievo annullato
+  const ds = m.filter((x) => /dust/.test(x.descrizione));
+  assert.equal(ds.length, 2); assert.equal(qn(voce(ds[0], "a").q) + qn(voce(ds[1], "a").q), 1);
+  const dl = m.filter((x) => x.tipo === "trade" && voce(x, "a").simbolo === "USDC")[0]; assert.equal(voce(dl, "da").simbolo, "USDT");
+  assert.ok(m.some((x) => x.tipo === "deposit" && /Futures/.test(x.descrizione)));
+  assert.ok(m.some((x) => x.tag === "cashback" && voce(x, "a").simbolo === "BTC"));
+  assert.equal(qn(r.saldiIniziali.SOL), 5);
+  assert.ok(r.avvisi.some((a) => /non parte dall'apertura/.test(a)));
+  assert.ok(r.avvisi.some((a) => /annullati/.test(a)));
+});
+
 t("API: ledger convertito nel CSV «Ledgers», unito al CSV senza doppioni", () => {
   const api = { L1: { refid: "R1", time: 1614592800.0, type: "deposit", subtype: "", aclass: "currency", asset: "ZEUR", amount: "1000.0000", fee: "0.0000", balance: "1000.0000" },
     L99: { refid: "T9", time: 1614700000.5, type: "trade", subtype: "", aclass: "currency", asset: "ZEUR", amount: "-10.0000", fee: "0.0300", balance: "1" },
