@@ -549,11 +549,29 @@
   }
   /* ---------- riepilogo finale e fascicolo per il contribuente ---------- */
   function calcoliFascicolo() { return calcoliSanzioni().slice().sort(function (x, y) { return x.anno - y.anno; }); }
+  /* righi del riepilogo di un anno, uno per quadro: RW (monitoraggio), IVACA, RT, altre sanzioni (es. dichiarazione tardiva).
+     Se la dichiarazione omessa non è ravvedibile le sanzioni non sono per voce (1/3 complessivo): un solo rigo per l'anno */
+  function righiRiepilogoAnno(r) {
+    if (!r.ravvedibile) return [{ quadro: "Tutti i quadri", base: "", imposte: r.imposte, sanzioni: r.sanzioni, interessi: r.interessi, totale: r.totale }];
+    var gruppi = [
+      { quadro: "Quadro RW · monitoraggio", prova: function (v) { return /RW/.test(v.voce); }, base: "valore " + E(+r.dati.valoreRw || 0, 0) },
+      { quadro: "Quadro RW · IVACA", prova: function (v) { return /IVACA/.test(v.voce); }, base: "" },
+      { quadro: "Quadro RT · plusvalenze", prova: function (v) { return /\(RT\)/.test(v.voce); }, base: "plusvalenze " + E(plusvalenzeAnno(r.dati), 0) },
+      { quadro: "Altre sanzioni", prova: function () { return true; }, base: "" }];
+    gruppi.forEach(function (g) { g.imposte = 0; g.sanzioni = 0; g.interessi = 0; g.n = 0; });
+    r.voci.forEach(function (v) { var g = gruppi.filter(function (x) { return x.prova(v); })[0]; g.imposte += v.imposta || 0; g.sanzioni += v.sanzione || 0; g.interessi += v.interessi || 0; g.n++; });
+    return gruppi.filter(function (g) { return g.n && (g.imposte || g.sanzioni || g.interessi); }).map(function (g) { g.totale = g.imposte + g.sanzioni + g.interessi; return g; });
+  }
   function tabellaRiepilogo(calc) {
     var tot = function (k) { return calc.reduce(function (s, r) { return s + (r[k] || 0); }, 0); };
-    return '<table class="det"><thead><tr><th>Anno</th><th class="n">Valore RW</th><th class="n">IVACA</th><th class="n">Plusvalenze RT</th><th>Riduzione sanzioni</th><th class="n">Imposte</th><th class="n">Sanzioni</th><th class="n">Interessi</th><th class="n">Totale</th></tr></thead><tbody>' +
-      calc.map(function (r) { return "<tr><td>" + r.anno + '</td><td class="n">' + E(+r.dati.valoreRw || 0, 0) + '</td><td class="n">' + E(r.anno < 2023 ? 0 : +r.dati.ivaca || 0, 0) + '</td><td class="n">' + E(plusvalenzeAnno(r.dati), 0) + "</td><td>" + esc(riduzioneAnno(r).breve) + '</td><td class="n">' + E(r.imposte) + '</td><td class="n">' + E(r.sanzioni) + '</td><td class="n">' + E(r.interessi) + '</td><td class="n">' + E(r.totale) + "</td></tr>"; }).join("") +
-      '<tr class="tot"><td>Totale</td><td colspan="4"></td><td class="n">' + E(tot("imposte")) + '</td><td class="n">' + E(tot("sanzioni")) + '</td><td class="n">' + E(tot("interessi")) + '</td><td class="n">' + E(tot("totale")) + "</td></tr></tbody></table>";
+    var celle = function (x) { return '<td class="n">' + E(x.imposte) + '</td><td class="n">' + E(x.sanzioni) + '</td><td class="n">' + E(x.interessi) + '</td><td class="n">' + E(x.totale) + "</td>"; };
+    return '<table class="det"><thead><tr><th>Anno</th><th>Quadro</th><th class="n">Base</th><th>Riduzione sanzioni</th><th class="n">Imposte</th><th class="n">Sanzioni</th><th class="n">Interessi</th><th class="n">Totale</th></tr></thead><tbody>' +
+      calc.map(function (r) {
+        var righi = righiRiepilogoAnno(r), rid = esc(riduzioneAnno(r).breve);
+        return righi.map(function (g, i) { return "<tr><td>" + (i ? "" : r.anno) + "</td><td>" + esc(g.quadro) + '</td><td class="n">' + esc(g.base) + "</td><td>" + (g.sanzioni ? rid : "") + "</td>" + celle(g) + "</tr>"; }).join("") +
+          (righi.length > 1 ? '<tr style="font-weight:600"><td></td><td>Totale ' + r.anno + '</td><td></td><td></td>' + celle(r) + "</tr>" : "");
+      }).join("") +
+      '<tr class="tot"><td>Totale</td><td colspan="3"></td><td class="n">' + E(tot("imposte")) + '</td><td class="n">' + E(tot("sanzioni")) + '</td><td class="n">' + E(tot("interessi")) + '</td><td class="n">' + E(tot("totale")) + "</td></tr></tbody></table>";
   }
   /* contenuto del fascicolo, anno per anno: che cosa c'è e che cosa manca */
   function contenutoFascicolo(calc) {
