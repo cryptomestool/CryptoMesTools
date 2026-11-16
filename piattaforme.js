@@ -8,7 +8,7 @@
    nella valuta del file (USD per Coinbase e Nexo) oppure assente, da completare con i prezzi di mercato.
    Piattaforme: Binance (Transaction History, con Deposit e Withdraw History per indirizzi e hash e il report fiscale per i
    valori in euro), Coinbase (report delle transazioni) e Coinbase Pro (estratto conto «account»), Nexo, Young Platform, Revolut (sezione Cripto e
-   Revolut X), Kraken (Ledgers, da CSV o da API), Relai, Ledger Live, BitBoxApp, Etherscan; l'estratto conto in euro di Revolut è riconosciuto ma non contiene le cripto. */
+   Revolut X), Kraken (Ledgers, da CSV o da API), Crypto.com (conto cripto, conto in euro e carta), Relai, Ledger Live, BitBoxApp, Etherscan; l'estratto conto in euro di Revolut è riconosciuto ma non contiene le cripto. */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory(require("./detenzione.js"));
   else root.KoinlyPiattaforme = factory(root.KoinlyDetenzione);
@@ -620,9 +620,112 @@
     return res;
   }
 
+  /* ---------- Crypto.com App: esportazioni «crypto_transactions_record» (conto cripto), «cash» o «fiat» (conto in euro) e «card»
+     (carta), tutte con le colonne Timestamp (UTC), Transaction Description, Currency, Amount, To Currency, To Amount, Native Currency,
+     Native Amount, Transaction Kind. Il conto cripto è la fonte: dalla carta e dal conto in euro si prendono solo le operazioni con
+     cripto che nel conto cripto mancano (es. se si carica solo la carta). Più esportazioni dello stesso periodo si uniscono: la chiave
+     ignora la descrizione, che cambia tra un'esportazione e l'altra («CRO -> ADA» o «CRO > ADA»). ---------- */
+  var CDC_COLONNE = ["Timestamp (UTC)", "Transaction Description", "Currency", "Amount", "To Currency", "Transaction Kind"];
+  /* spostamenti tra il conto cripto e i prodotti della stessa app (Earn, Supercharger, staking, ordini limite non eseguiti): non contano */
+  var CDC_INTERNI = /^(supercharger_deposit|supercharger_withdrawal|crypto_earn_program_created|crypto_earn_program_withdrawn|lockup_lock|lockup_unlock|lockup_upgrade|finance\.lockup\.dpos_(lock|unlock)\..*|finance\.dpos\.(staking|unstaking)\..*|trading\.limit_order\..*_(lock|unlock)|.*_(lock|unlock)$)$/;
+  function cdcTipoFile(nome, righe) {
+    var n = String(nome || "").toLowerCase();
+    if (/^card_/.test(n)) return "card"; if (/^(cash|fiat)_/.test(n)) return "cash"; if (/^crypto_/.test(n)) return "crypto";
+    if (righe.length && righe.every(function (x) { return !x["Transaction Kind"]; })) return "card";
+    if (righe.length && righe.every(function (x) { return /^(viban_|crypto_viban$|trading\.)/.test(x["Transaction Kind"]); })) return "cash";
+    return "crypto";
+  }
+  function leggiCryptoCom(files) {
+    var W = "Crypto.com", mov = [], avvisi = [], perTipo = { crypto: [], card: [], cash: [] }, nFile = { crypto: 0, card: 0, cash: 0 }, vuoti = [], letti = 0, doppi = 0;
+    files.forEach(function (f) {
+      var r = tabella(f.testo, CDC_COLONNE) || [], t = cdcTipoFile(f.nome, r); nFile[t]++; letti += r.length;
+      if (!r.length) vuoti.push(f.nome);
+      r.forEach(function (x) {
+        x.ts = data(x["Timestamp (UTC)"]); x.cur = String(x.Currency || "").toUpperCase(); x.amt = q(x.Amount);
+        x.toCur = String(x["To Currency"] || "").toUpperCase(); x.toAmt = q(x["To Amount"]); x.kind = String(x["Transaction Kind"] || "").trim();
+        x.nat = String(x["Native Currency"] || "").toUpperCase(); x.natAmt = Math.abs(num(x["Native Amount"])); x.desc = x["Transaction Description"] || ""; x.file = t;
+        if (x.ts != null) perTipo[t].push(x);
+      });
+    });
+    var chiave = function (x) { return [x.ts, x.cur, D.decStr(x.amt), x.toCur, D.decStr(x.toAmt), x.kind].join("|"); };
+    var visti = {}, cr = perTipo.crypto.filter(function (x) { var k = chiave(x); if (visti[k]) { doppi++; return false; } visti[k] = 1; return true; });
+    cr.sort(function (a, b) { return a.ts - b.ts || a._riga - b._riga; });
+    var fiat = function (s) { return FIAT.indexOf(s) >= 0; };
+    var cv = function (x) { return x.natAmt && x.nat && x.nat !== "EUR" ? { importo: x.natAmt, valuta: x.nat } : null; };
+    var val = function (x) { return x.natAmt && x.nat === "EUR" ? x.natAmt : 0; };
+    var spingi = function (o) { var t = movimento(o); if (t) mov.push(t); };
+    var interni = 0, storni = 0, polvere = 0, sconosciuti = {}, trasf = 0, usati = new Set();
+    var dust = [], swap = [];
+    cr.forEach(function (x) {
+      var k = x.kind, base = { riga: x._riga, ts: x.ts, wallet: W, descrizione: x.desc || k, valore: val(x), controvalore: cv(x) };
+      if (CDC_INTERNI.test(k)) { interni++; return; }
+      if (/^dust_conversion_(debited|credited)$/.test(k)) { dust.push(x); return; }
+      if (/^crypto_wallet_swap_(debited|credited)$/.test(k)) { swap.push(x); return; }
+      if (x.toCur && x.toAmt !== 0n && x.amt < 0n) return spingi(Object.assign(base, { tipo: "trade", da: [x.cur, x.amt], a: [x.toCur, x.toAmt] }));
+      if (k === "crypto_purchase" && x.amt > 0n) return spingi(Object.assign(base, { tipo: "trade", da: x.natAmt ? [x.nat, D.dec(String(x.natAmt))] : null, a: [x.cur, x.amt], descrizione: "Acquisto con carta: " + x.desc }));
+      if (k === "card_top_up" && x.amt < 0n) return spingi(Object.assign(base, { tipo: "trade", da: [x.cur, x.amt], a: x.natAmt ? [x.nat, D.dec(String(x.natAmt))] : null, descrizione: "Ricarica della carta: " + x.desc }));
+      if (/revert|reversal/i.test(k) && x.amt < 0n) { storni++; return spingi(Object.assign(base, { tipo: "withdrawal", tag: "cost", da: [x.cur, x.amt], descrizione: "Storno: " + x.desc })); }
+      if (x.amt > 0n && /cashback|reimbursement|rebate|reward|interest|bonus|gift|airdrop|admin_wallet_credited|mission|rewards_platform/i.test(k)) {
+        var tag = /admin_wallet_credited|airdrop/i.test(k) ? "airdrop" : /cashback|reimbursement|rebate/i.test(k) ? "cashback" : /earn_interest/i.test(k) ? "lending_interest" : "reward";
+        return spingi(Object.assign(base, { tipo: "deposit", tag: tag, a: [x.cur, x.amt] }));
+      }
+      if (k === "crypto_deposit" && x.amt > 0n) return spingi(Object.assign(base, { tipo: "deposit", a: [x.cur, x.amt], txHash: x["Transaction Hash"] || "" }));
+      if (k === "crypto_withdrawal" && x.amt < 0n) return spingi(Object.assign(base, { tipo: "withdrawal", da: [x.cur, x.amt], txHash: x["Transaction Hash"] || "" }));
+      if (k === "crypto_transfer") { trasf++; return spingi(Object.assign(base, { tipo: x.amt > 0n ? "deposit" : "withdrawal", a: x.amt > 0n ? [x.cur, x.amt] : null, da: x.amt < 0n ? [x.cur, x.amt] : null, descrizione: "Crypto.com Pay, " + (x.amt > 0n ? "ricevuto da" : "inviato a") + " un altro utente: " + x.desc })); }
+      if (x.amt === 0n) return;
+      sconosciuti[k || "(vuoto)"] = (sconosciuti[k || "(vuoto)"] || 0) + 1;
+      spingi(Object.assign(base, { tipo: x.amt > 0n ? "deposit" : "withdrawal", a: x.amt > 0n ? [x.cur, x.amt] : null, da: x.amt < 0n ? [x.cur, x.amt] : null }));
+    });
+    // conversione dei residui: più cripto cedute nello stesso momento (entro 5 secondi) per CRO; ricevuto diviso in parti uguali
+    var gruppi = []; dust.forEach(function (x) { var g = gruppi.filter(function (z) { return Math.abs(z.ts - x.ts) <= 5000; })[0]; if (!g) { g = { ts: x.ts, righe: [] }; gruppi.push(g); } g.righe.push(x); });
+    gruppi.forEach(function (g) {
+      var usc = g.righe.filter(function (x) { return x.amt < 0n; }), ent = g.righe.filter(function (x) { return x.amt > 0n; });
+      if (ent.length === 1 && usc.length) {
+        polvere++; var e = ent[0], parte = e.amt / BigInt(usc.length), dato = 0n;
+        usc.forEach(function (u, i) { var qa = i === usc.length - 1 ? e.amt - dato : parte; dato += qa; spingi({ riga: u._riga, ts: e.ts, tipo: "trade", wallet: W, da: [u.cur, u.amt], a: [e.cur, qa], descrizione: "Conversione dei residui in " + e.cur + " (" + (i + 1) + " di " + usc.length + ")" }); });
+      } else g.righe.forEach(function (x) { spingi({ riga: x._riga, ts: x.ts, wallet: W, tipo: x.amt > 0n ? "deposit" : "withdrawal", a: x.amt > 0n ? [x.cur, x.amt] : null, da: x.amt < 0n ? [x.cur, x.amt] : null, descrizione: "Conversione dei residui (senza contropartita)" }); });
+    });
+    // conversione del saldo tra stablecoin: uscita e entrata nello stesso momento
+    swap.filter(function (x) { return x.amt < 0n; }).forEach(function (u) {
+      var e = swap.filter(function (x) { return x.amt > 0n && !usati.has(x) && Math.abs(x.ts - u.ts) <= 60000; })[0];
+      if (e) { usati.add(e); spingi({ riga: u._riga, ts: u.ts, tipo: "trade", wallet: W, da: [u.cur, u.amt], a: [e.cur, e.amt], descrizione: "Conversione del saldo " + u.cur + " → " + e.cur }); }
+      else spingi({ riga: u._riga, ts: u.ts, tipo: "withdrawal", wallet: W, da: [u.cur, u.amt], descrizione: u.desc });
+    });
+    swap.filter(function (x) { return x.amt > 0n && !usati.has(x); }).forEach(function (e) { spingi({ riga: e._riga, ts: e.ts, tipo: "deposit", wallet: W, a: [e.cur, e.amt], descrizione: e.desc }); });
+    // carta e conto in euro: operazioni con cripto non presenti nel conto cripto
+    var nelConto = function (sim, qta, ts) { return cr.some(function (y) { return Math.abs(y.ts - ts) <= 300000 && ((y.cur === sim && abs(y.amt) === qta) || (y.toCur === sim && abs(y.toAmt) === qta)); }); };
+    var aggiunte = 0, soloEuro = 0, gia = 0;
+    perTipo.card.concat(perTipo.cash).forEach(function (x) {
+      var cr1 = !fiat(x.cur) && x.cur ? x.cur : null, cr2 = !fiat(x.toCur) && x.toCur ? x.toCur : null;
+      if (!cr1 && !cr2) { soloEuro++; return; }
+      var sim = cr2 || cr1, qta = cr2 ? abs(x.toAmt) : abs(x.amt);
+      if (nelConto(sim, qta, x.ts)) { gia++; return; }
+      aggiunte++;
+      var base = { riga: x._riga, ts: x.ts, wallet: W, valore: val(x), controvalore: cv(x), descrizione: (x.file === "card" ? "Carta: " : "Conto in euro: ") + x.desc };
+      if (x.file === "card" && cr2 && fiat(x.cur)) spingi(Object.assign(base, { tipo: "trade", da: [cr2, qta], a: [x.cur, abs(x.amt)] }));         // ricarica della carta vendendo cripto
+      else if (cr2 && fiat(x.cur)) spingi(Object.assign(base, { tipo: "trade", da: [x.cur, abs(x.amt)], a: [cr2, qta] }));                            // acquisto con euro
+      else if (cr1 && fiat(x.toCur)) spingi(Object.assign(base, { tipo: "trade", da: [cr1, abs(x.amt)], a: [x.toCur, abs(x.toAmt)] }));              // vendita per euro
+      else { aggiunte--; sconosciuti[(x.file === "card" ? "carta: " : "conto in euro: ") + (x.kind || x.desc)] = (sconosciuti[(x.file === "card" ? "carta: " : "conto in euro: ") + (x.kind || x.desc)] || 0) + 1; }
+    });
+    mov.sort(function (a, b) { return a.ts - b.ts || a.riga - b.riga; });
+    var tf = [nFile.crypto ? nFile.crypto + " del conto cripto" : "", nFile.cash ? nFile.cash + " del conto in euro" : "", nFile.card ? nFile.card + " della carta" : ""].filter(Boolean).join(", ");
+    avvisi.push("Crypto.com: " + files.length + " file (" + tf + ")" + (vuoti.length ? ", di cui " + vuoti.length + " senza operazioni" : "") + "; " + letti.toLocaleString("it-IT") + " righe lette" + (doppi ? ", " + doppi + " presenti in più esportazioni contate una volta" : "") + ".");
+    if (!nFile.crypto) avvisi.push("Manca l'esportazione del conto cripto («crypto_transactions_record»): senza, mancano ricompense, depositi, prelievi e scambi tra cripto.");
+    if (perTipo.card.length || perTipo.cash.length) avvisi.push("Carta e conto in euro: " + gia + " operazioni con cripto già presenti nel conto cripto" + (aggiunte ? ", " + aggiunte + " aggiunte perché mancanti" : "") + "; " + soloEuro.toLocaleString("it-IT") + " operazioni solo in euro (spese con la carta, bonifici) non riguardano le cripto.");
+    if (interni) avvisi.push(interni + " spostamenti interni all'app (Earn, Supercharger, staking, blocco e sblocco degli ordini) non contano; gli interessi e le ricompense sì.");
+    if (polvere) avvisi.push(polvere + " conversioni dei residui (Convert Dust): il CRO ricevuto è diviso in parti uguali tra le cripto cedute.");
+    if (storni) avvisi.push(storni + " storni di cashback o rimborsi della carta, letti come uscite.");
+    if (trasf) avvisi.push(trasf + " trasferimenti con altri utenti Crypto.com (Crypto.com Pay): da verificare (regali, pagamenti o conti propri).");
+    Object.keys(sconosciuti).forEach(function (s) { avvisi.push("Operazioni Crypto.com «" + s + "» non riconosciute (" + sconosciuti[s] + "): lette come entrate o uscite, da verificare."); });
+    var res = risultato("Crypto.com", mov, avvisi, letti);
+    res.interni = interni;
+    return res;
+  }
+
   /* ---------- riconoscimento ---------- */
   function riconosci(testo, nome) {
     if (haColonne(testo, ["Operation", "Coin", "Change"])) return "binance";
+    if (haColonne(testo, ["Timestamp (UTC)", "Transaction Description", "Currency", "Amount", "To Currency", "Transaction Kind"])) return "cryptocom";
     if (haColonne(testo, ["refid", "time", "type", "asset", "amount", "fee"])) return "kraken";
     if (haColonne(testo, ["txid", "ordertxid", "pair", "time", "type", "vol"])) return "kraken-scambi";
     if (haColonne(testo, ["datetime_tz_CET", "sent_amount", "received_amount", "sent_value_EUR"])) return "binance-fiscale";
@@ -659,7 +762,7 @@
       var o = { riga: x._riga, ts: ts, wallet: W, txHash: x["Operation Hash"] || "", descrizione: tipo, valore: cvT === "EUR" ? cvV : 0, controvalore: cvT && cvT !== "EUR" && cvV ? { importo: cvV, valuta: cvT } : null };
       if (/^(IN|REWARD|REWARD_PAYOUT|WITHDRAW_UNBONDED)$/.test(tipo)) { o.tipo = "deposit"; o.tag = /REWARD/.test(tipo) ? "reward" : ""; o.a = [sim, qta]; }
       else if (/^(OUT)$/.test(tipo)) { o.tipo = "withdrawal"; o.da = [sim, fee && qta > fee ? qta - fee : qta]; if (fee) o.fee = [sim, fee]; }
-      else if (/^(FEES|DELEGATE|UNDELEGATE|REDELEGATE|BOND|UNBOND|NONE|OPT_IN|APPROVE)$/.test(tipo)) { if (!fee) return; o.tipo = "withdrawal"; o.tag = "cost"; o.fee = [sim, fee]; }
+      else if (/^(FEES|DELEGATE|UNDELEGATE|REDELEGATE|BOND|UNBOND|NOMINATE|CHILL|SET_CONTROLLER|SET_PAYEE|NONE|OPT_IN|OPT_OUT|APPROVE|FREEZE|UNFREEZE|VOTE|REVEAL)$/.test(tipo)) { if (!fee) return; o.tipo = "withdrawal"; o.tag = "cost"; o.fee = [sim, fee]; }
       else { o.tipo = qta > 0n ? "deposit" : "withdrawal"; o.a = [sim, qta]; avvisi.push("Riga " + x._riga + ": operazione Ledger «" + tipo + "» non riconosciuta."); }
       var t = movimento(o); if (t) mov.push(t);
     });
@@ -792,13 +895,14 @@
   /* più file insieme: gli storici Binance si uniscono; Deposit e Withdraw History aggiungono indirizzi e hash; il report fiscale
      Binance dà i valori in euro; l'estratto Coinbase Pro si abbina ai trasferimenti «Pro Deposit / Pro Withdrawal» di Coinbase */
   function leggiFile(files) {
-    var esiti = [], extra = { depositi: null, prelievi: null }, principali = [], visti = {}, binance = [], fiscale = [], fills = [], scambiApp = [];
+    var esiti = [], extra = { depositi: null, prelievi: null }, principali = [], visti = {}, binance = [], fiscale = [], fills = [], scambiApp = [], cdc = [];
     files = files.filter(function (f) { var k = f.testo.length + ":" + f.testo.slice(0, 2000) + f.testo.slice(-2000); if (visti[k]) { esiti.push({ nome: f.nome, doppio: visti[k], errore: "Stesso contenuto di «" + visti[k] + "»: non letto una seconda volta." }); return false; } visti[k] = f.nome; return true; });
     files.forEach(function (f) {
       var tipo = riconosci(f.testo, f.nome);
       if (tipo === "binance-depositi") extra.depositi = (extra.depositi || []).concat(leggiBinanceMovimentiEsterni(f.testo, f.nome, "depositi") || []);
       else if (tipo === "binance-prelievi") extra.prelievi = (extra.prelievi || []).concat(leggiBinanceMovimentiEsterni(f.testo, f.nome, "prelievi") || []);
       else if (tipo === "binance") binance.push(f);
+      else if (tipo === "cryptocom") cdc.push(f);
       else if (tipo === "binance-fiscale") { var rf = righeFiscaleBinance(f.testo) || []; rf.forEach(function (x) { fiscale.push(x); }); esiti.push({ nome: f.nome, piattaforma: "Binance (report fiscale)", righe: rf.length, movimenti: [], avvisi: [], ausiliario: true }); }
       else if (tipo === "coinbase-pro-fills") fills.push(f);
       else if (tipo === "scambi-app") { var sa = leggiScambiApp(f.testo) || []; sa.forEach(function (x) { scambiApp.push(x); }); esiti.push({ nome: f.nome, piattaforma: "Scambi nelle app dei wallet", ausiliario: true, righe: sa.length, movimenti: [], avvisi: [sa.length + " scambi: uniranno uscite ed entrate on-chain in permute."] }); }
@@ -810,6 +914,7 @@
       var vf = {}; var uniche = fiscale.filter(function (x) { if (x.id && vf[x.id]) return false; vf[x.id] = 1; return true; });
       var rfb = leggiFiscaleBinance(uniche); rfb.nome = "report fiscale Binance"; esiti.push(rfb); fiscale = [];
     }
+    if (cdc.length) { var rc = leggiCryptoCom(cdc); rc.nome = cdc.map(function (f) { return f.nome; }).join(" + "); esiti.push(rc); }
     var haPro = principali.some(function (p) { return p.tipo === "coinbase-pro"; });
     if (fills.length) esiti.push({ nome: fills.map(function (f) { return f.nome; }).join(" + "), piattaforma: "Coinbase Pro (fills)", ausiliario: true, movimenti: [], avvisi: [(fills.length > 1 ? fills.length + " file" : "File") + " «fills» di Coinbase Pro non usati: " + (haPro ? "gli scambi sono già nell'estratto conto." : "contengono solo gli scambi; serve l'estratto conto «account», che ha anche depositi, prelievi e commissioni.")] });
     // stessa piattaforma in più file (anni, mesi, esportazioni ripetute): righe unite, ogni riga una volta sola
@@ -993,5 +1098,5 @@
     if (rk.length) cb[0].avvisi.push("Passaggi tra Coinbase e Coinbase Pro senza la voce corrispondente nell'estratto Pro: " + rk.map(function (k) { return D.decStr(resto[k], 8) + " " + k; }).join(", ") + ".");
   }
 
-  return { riconosci: riconosci, leggiFile: leggiFile, abbinaTrasferimenti: abbinaTrasferimenti, togliDoppioni: togliDoppioni, leggiScambiApp: leggiScambiApp, applicaScambi: applicaScambi, leggiRevolut: leggiRevolut, leggiRelai: leggiRelai, leggiBitBox: leggiBitBox, leggiEtherscan: leggiEtherscan, dataRevolut: dataRevolut, leggiCoinbasePro: leggiCoinbasePro, romaUTC: romaUTC, leggiBinance: leggiBinance, leggiCoinbase: leggiCoinbase, leggiNexo: leggiNexo, leggiYoung: leggiYoung, leggiLedger: leggiLedger, leggiKraken: leggiKraken, krakenSim: krakenSim, scartoDaNome: scartoDaNome, righeCsv: righeCsv };
+  return { riconosci: riconosci, leggiFile: leggiFile, abbinaTrasferimenti: abbinaTrasferimenti, togliDoppioni: togliDoppioni, leggiScambiApp: leggiScambiApp, applicaScambi: applicaScambi, leggiRevolut: leggiRevolut, leggiRelai: leggiRelai, leggiBitBox: leggiBitBox, leggiEtherscan: leggiEtherscan, dataRevolut: dataRevolut, leggiCoinbasePro: leggiCoinbasePro, romaUTC: romaUTC, leggiBinance: leggiBinance, leggiCoinbase: leggiCoinbase, leggiNexo: leggiNexo, leggiYoung: leggiYoung, leggiLedger: leggiLedger, leggiKraken: leggiKraken, krakenSim: krakenSim, leggiCryptoCom: leggiCryptoCom, scartoDaNome: scartoDaNome, righeCsv: righeCsv };
 });

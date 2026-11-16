@@ -236,4 +236,25 @@ t("scambi nell'app SafePal: uscita BTC e entrata USDC su blockchain diverse dive
   assert.equal(t0.walletA, "SafePal 2 ETH"); assert.equal(voce(t0, "a").simbolo, "USDC"); assert.equal(D.decStr(voce(t0, "fee").q), "-0.0001");
 });
 
+t("Crypto.com: scambi, interni, ordini limite, residui, doppioni tra esportazioni, carta già presente", () => {
+  const H = "Timestamp (UTC),Transaction Description,Currency,Amount,To Currency,To Amount,Native Currency,Native Amount,Native Amount (in USD),Transaction Kind,Transaction Hash\n";
+  const a = H + "2020-10-02 10:51:52,CRO -> ADA,CRO,-1000.0,ADA,1601.0,USD,144.76,144.76,crypto_exchange,\n" +
+    "2020-10-02 10:19:31,Buy CRO,CRO,1000.0,,,USD,147.14,147.14,crypto_purchase,\n";
+  const b = H + "2020-10-02 10:51:52,CRO > ADA,CRO,-1000.0,ADA,1601.0,USD,144.76,144.76,crypto_exchange,\n" +
+    "2025-03-02 16:53:51,Sell ADA,ADA,-1601.0,EUR,1800,USD,1900,1900,trading.limit_order.cash_account.sell_lock,\n" +
+    "2025-03-02 22:54:57,Sell ADA,ADA,1601.0,EUR,1800,USD,1900,1900,trading.limit_order.cash_account.sell_unlock,\n" +
+    "2025-03-03 00:01:02,Sold ADA,ADA,-1601.0,EUR,1700,USD,1800,1800,trading.limit_order.cash_account.sell_commit,\n" +
+    "2025-04-01 10:00:00,Crypto Earn Allocation,EUR,0,,,USD,0,0,crypto_earn_program_created,\n" +
+    "2025-04-18 11:45:00,Convert Dust,CRO,0.04,,,USD,0.01,0.01,dust_conversion_credited,\n2025-04-18 11:45:00,Convert Dust,ADA,-0.001,,,USD,0.01,0.01,dust_conversion_debited,\n2025-04-18 11:44:59,Convert Dust,DOGE,-0.007,,,USD,0.01,0.01,dust_conversion_debited,\n" +
+    "2025-05-01 10:00:00,Card Cashback,CRO,2.0,,,USD,0.2,0.2,referral_card_cashback,\n";
+  const card = H + "2025-03-03 00:01:30,ADA -> EUR,EUR,1700,ADA,1601.0,EUR,1700,1800,,\n2025-03-04 10:00:00,Netflix.Com,EUR,-6.99,,,EUR,-6.99,-7.5,,\n";
+  const r = P.leggiFile([{ nome: "crypto_transactions_record_a.csv", testo: a }, { nome: "crypto_transactions_record_b.csv", testo: b }, { nome: "card_transactions_record_c.csv", testo: card }]).file.filter((e) => e.piattaforma === "Crypto.com")[0];
+  const m = r.movimenti;
+  assert.equal(m.filter((x) => x.tipo === "trade" && voce(x, "a").simbolo === "ADA").length, 1); // CRO -> ADA una volta sola
+  const vendite = m.filter((x) => x.tipo === "trade" && voce(x, "da").simbolo === "ADA" && voce(x, "a").simbolo === "EUR");
+  assert.equal(vendite.length, 1); assert.equal(vendite[0].valore, 1700); // solo l'ordine eseguito, la carta non lo raddoppia
+  assert.equal(m.filter((x) => /residui/.test(x.descrizione)).length, 2);
+  assert.equal(m.filter((x) => x.tag === "cashback").length, 1);
+  assert.ok(r.avvisi.some((x) => /presenti in più esportazioni/.test(x)));
+});
 console.log(n + " prove superate");

@@ -2,6 +2,7 @@
 /* CryptoMesTools · prezzi in euro per le transazioni lette senza Koinly (piattaforme e blockchain).
    - Cripto: prezzo di chiusura giornaliero (UTC) delle coppie Binance in euro (es. BTCEUR); dove la coppia in euro manca
      o non copre quel giorno, la coppia in USDT convertita in euro al cambio BCE del giorno (USDT considerato pari al dollaro).
+     Per le cripto che Binance non quota (es. CRO), la chiusura in dollari di Crypto.com Exchange al cambio BCE.
    - Valute tradizionali e stablecoin legate al dollaro: cambio di riferimento BCE (api.frankfurter.dev); nei giorni senza
      fixing (fine settimana, festivi) vale l'ultimo cambio disponibile.
    - Ai servizi arrivano solo il simbolo della cripto o della valuta e l'intervallo di date: mai quantità, indirizzi o dati del cliente.
@@ -12,7 +13,7 @@
   else root.KoinlyPrezzi = factory(root.KoinlyDetenzione);
 })(typeof self !== "undefined" ? self : this, function (D) {
   "use strict";
-  var BINANCE = "https://api.binance.com/api/v3/klines", BCE = "https://api.frankfurter.dev/v1/";
+  var BINANCE = "https://api.binance.com/api/v3/klines", BCE = "https://api.frankfurter.dev/v1/", CDC = "https://api.crypto.com/exchange/v1/public/get-candlestick";
   var FIAT_BCE = ["USD", "GBP", "CHF", "JPY", "CAD", "AUD"], USD_STABLE = ["USDT", "USDC", "BUSD", "DAI", "TUSD", "USDP", "FDUSD", "PYUSD", "PAX", "GUSD", "UST", "USDE"];
   var EUR_STABLE = ["EURC", "EURT", "EURI", "EURS", "AEUR"];
   var GIORNO = 86400000;
@@ -50,6 +51,22 @@
       return out;
     }
 
+    /* seconda fonte per le cripto che Binance non quota (es. CRO): chiusure giornaliere in dollari di Crypto.com Exchange,
+       lette a ritroso a blocchi di 300 giorni; null se la coppia non esiste */
+    async function caricaSerieCdc(sim, da, a) {
+      var out = {}, inizio = ms(da), fine = ms(a) + GIORNO - 1;
+      for (var giri = 0; giri < 40 && fine >= inizio; giri++) {
+        var r = await json(CDC + "?instrument_name=" + sim + "_USD&timeframe=1D&start_ts=" + inizio + "&end_ts=" + fine + "&count=300");
+        if (!r || r.code || !r.result) return giri ? out : null;
+        var d = r.result.data || []; if (!d.length) break;
+        d.forEach(function (k) { out[giorno(k.t)] = parseFloat(k.c); });
+        var primo = Math.min.apply(null, d.map(function (k) { return k.t; }));
+        if (d.length < 300) break;
+        fine = primo - 1;
+      }
+      return out;
+    }
+
     /* richieste: elenco di { simbolo, giorno: "AAAA-MM-GG" } */
     async function prepara(richieste) {
       var perSimbolo = {}, min = null, max = null;
@@ -80,8 +97,14 @@
             if (vecchia) { usdt = usdt || {}; Object.keys(vecchia).forEach(function (g) { if (g <= fino && usdt[g] == null && !(eur && eur[g] != null)) usdt[g] = vecchia[g]; }); }
           }
         }
-        serie[s] = { da: p.da, a: p.a, eur: eur || {}, usdt: usdt || {} };
-        if (!giorniEur.length && !(usdt && Object.keys(usdt).length)) mancanti[s] = true;
+        var usd = null;
+        if (!giorniEur.length && !(usdt && Object.keys(usdt).length)) {
+          if (opz.avanzamento) opz.avanzamento("prezzi " + s + " su Crypto.com Exchange");
+          try { usd = await caricaSerieCdc(s, p.da, p.a); } catch (e) { usd = null; }
+          if (usd && !Object.keys(usd).length) usd = null;
+        }
+        serie[s] = { da: p.da, a: p.a, eur: eur || {}, usdt: usdt || {}, usd: usd || {} };
+        if (!giorniEur.length && !(usdt && Object.keys(usdt).length) && !usd) mancanti[s] = true;
       }
     }
 
@@ -100,6 +123,7 @@
       var nota = s !== String(simbolo || "").toUpperCase().trim() ? " (come " + s + ")" : "";
       if (x.eur[g] != null) return { eur: x.eur[g], fonte: "Binance " + s + "/EUR" + nota };
       if (x.usdt[g] != null) { var cu = cambio("USD", g); if (cu) return { eur: x.usdt[g] * cu, fonte: "Binance " + s + "/USDT al cambio BCE" + nota }; }
+      if (x.usd && x.usd[g] != null) { var cd = cambio("USD", g); if (cd) return { eur: x.usd[g] * cd, fonte: "Crypto.com Exchange " + s + "/USD al cambio BCE" + nota }; }
       return null;
     }
     return { prepara: prepara, prezzo: prezzo, cambio: cambio, mancanti: function () { return Object.keys(mancanti); } };

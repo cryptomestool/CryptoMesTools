@@ -114,5 +114,17 @@ const mov = [
     assert.equal(P3.prezzo("LUNC", "2022-07-01"), null);
     assert.equal(P3.prezzo("LUNC", "2023-12-31").eur, 0.00014 * 0.8);
   });
+  // CRO non è su Binance: chiusura in dollari di Crypto.com Exchange al cambio BCE
+  const json4 = (url) => {
+    if (url.indexOf("frankfurter") >= 0) return Promise.resolve({ rates: { "2025-12-31": { USD: 1.25 } } });
+    if (url.indexOf("crypto.com") >= 0) return Promise.resolve(/instrument_name=CRO_USD/.test(url) ? { code: 0, result: { data: [{ t: Date.UTC(2025, 11, 31), c: "0.1" }] } } : null);
+    return Promise.resolve(null);
+  };
+  const P4 = Z.crea({ json: json4 });
+  await P4.prepara([{ simbolo: "CRO", giorno: "2025-12-31" }, { simbolo: "NONESISTE", giorno: "2025-12-31" }]);
+  t("cripto senza Binance: prezzo da Crypto.com Exchange", () => {
+    assert.deepEqual(P4.prezzo("CRO", "2025-12-31"), { eur: 0.1 * 0.8, fonte: "Crypto.com Exchange CRO/USD al cambio BCE" });
+    assert.deepEqual(P4.mancanti(), ["NONESISTE"]);
+  });
   console.log(n + " prove superate");
 })().catch((e) => { console.log("ERRORE", e && e.stack || e); });
