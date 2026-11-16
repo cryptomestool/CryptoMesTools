@@ -110,15 +110,21 @@
           controlli: chiave di CONTROLLI (predefinito "nessuno"), esteri: tesi prudenziale della maggiorazione di 1/3 per redditi esteri
           (solo testo previgente), riduzione: maggiore imposta < 3% e < 30.000 € (art. 1 c. 4), fraudolente: condotte del comma 3,
           invio: data di invio della dichiarazione originaria (caso dubbio sulla decorrenza), regime: "previgente" | "nuovo" per forzarlo } */
+  var SOGLIA_IVACA = 12; // euro: l'imposta complessiva fino a questo importo non è dovuta (istruzioni quadro RW, rigo RW8)
   function calcolaAnno(d) {
     var T = termini(d.anno), pag = d.pagamento, C = CONTROLLI[d.controlli] ? d.controlli : "nessuno";
     var out = { anno: d.anno, stato: d.stato, termini: T, voci: [], note: [], avvisi: [], controlli: C };
     // l'imposta sul valore è dovuta dal 2023: prima resta solo l'obbligo di monitoraggio (RW) e la relativa sanzione
     // imposte in unità di euro, come nei quadri RW (rigo RW8) e RT della dichiarazione da cui si versano
     var valoreRw = Math.max(0, +d.valoreRw || 0), ivaca = d.anno >= 2023 ? Math.round(Math.max(0, +d.ivaca || 0)) : 0, plus = +d.plusvalenze || 0;
+    // IVACA complessiva (rigo RW8) fino a 12 euro: non si versa, quindi niente imposta, sanzioni né interessi (resta il quadro RW)
+    var ivacaCalcolata = ivaca;
+    if (ivaca > 0 && ivaca <= SOGLIA_IVACA) ivaca = 0;
     var rt = regimeRt(d.anno), baseRt = Math.round(Math.max(0, plus - rt.franchigia)), impRt = Math.round(baseRt * rt.aliquota);
     var imposte = ivaca + impRt, tributi = [["Imposta sul valore (IVACA)", ivaca], ["Imposta sulle plusvalenze (RT)", impRt]];
     out.rt = { plusvalenze: plus, franchigia: rt.franchigia, base: baseRt, aliquota: rt.aliquota, imposta: impRt, nota: rt.nota };
+    out.ivacaCalcolata = ivacaCalcolata; out.ivacaSottoSoglia = ivacaCalcolata > 0 && ivaca === 0;
+    if (out.ivacaSottoSoglia) out.note.push("IVACA di " + fmt(ivacaCalcolata) + " (rigo RW8): non supera " + SOGLIA_IVACA + " € e non si versa. Niente imposta, sanzioni né interessi sull'IVACA; il quadro RW va comunque compilato.");
     if (d.anno < 2023) out.note.push("Per il " + d.anno + " l'imposta sul valore delle cripto-attività (IVACA) non era dovuta (si applica dal 2023): niente imposta né sanzioni IVACA, resta la sanzione per omesso monitoraggio nel quadro RW.");
 
     var inTermine = pag <= T.dichiarazione;
@@ -260,5 +266,5 @@
   }
   function fmt(x) { try { return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(x); } catch (e) { return x.toFixed(2) + " €"; } }
 
-  return { calcolaAnno: calcolaAnno, CONTROLLI: CONTROLLI, decadenza: decadenza, termini: termini, interessi: interessi, frazioneDichiarazione: frazioneDichiarazione, frazioneVersamento: frazioneVersamento, baseVersamento: baseVersamento, regimeRt: regimeRt, TERMINI: TERMINI, INTERESSI: INTERESSI };
+  return { calcolaAnno: calcolaAnno, SOGLIA_IVACA: SOGLIA_IVACA, CONTROLLI: CONTROLLI, decadenza: decadenza, termini: termini, interessi: interessi, frazioneDichiarazione: frazioneDichiarazione, frazioneVersamento: frazioneVersamento, baseVersamento: baseVersamento, regimeRt: regimeRt, TERMINI: TERMINI, INTERESSI: INTERESSI };
 });

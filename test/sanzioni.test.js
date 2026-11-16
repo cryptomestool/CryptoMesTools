@@ -2,6 +2,7 @@
 "use strict";
 const assert = require("assert");
 const Z = require("../sanzioni.js");
+const M = require("../modelli.js");
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= (tol || 0.01), (msg || "") + " atteso " + b + ", ottenuto " + a);
 let n = 0; const t = (nome, fn) => { fn(); n++; console.log("ok -", nome); };
 const PAG = "2026-10-24";
@@ -114,5 +115,15 @@ t("Calcolo esplicito delle sanzioni: base × aliquota = sanzione piena, ridotta 
   assert.equal(rw.base, 100000); assert.equal(rw.aliquota, 0.03); near(rw.piena, 3000); assert.equal(rw.frazione.lettera, "b-ter");
   near(r.voci.find((v) => /RW/.test(v.voce)).sanzione, 500);
   assert.equal(rt.base, 2600); assert.equal(rt.aliquota, 0.9); near(rt.piena, 2340); near(r.voci.find((v) => /RT/.test(v.voce)).sanzione, 390);
+});
+t("IVACA fino a 12 euro: non si versa, niente sanzioni, interessi né F24", () => {
+  const sotto = Z.calcolaAnno({ anno: 2024, stato: "presentata", valoreRw: 5000, ivaca: 11.6, plusvalenze: 0, pagamento: PAG });
+  assert.ok(sotto.ivacaSottoSoglia); assert.equal(sotto.ivacaCalcolata, 12);
+  assert.ok(!sotto.voci.some((v) => /IVACA/.test(v.voce) && (v.imposta || v.sanzione || v.interessi)));
+  assert.ok(sotto.note.some((n) => /non supera 12/.test(n)));
+  assert.ok(!M.f24([sotto]).righe.some((x) => x.codice === "1727"));
+  const sopra = Z.calcolaAnno({ anno: 2024, stato: "presentata", valoreRw: 7000, ivaca: 13, plusvalenze: 0, pagamento: PAG });
+  assert.ok(!sopra.ivacaSottoSoglia);
+  assert.equal(M.f24([sopra]).righe.filter((x) => x.codice === "1727")[0].importo, 13);
 });
 console.log("\n" + n + " prove superate");

@@ -774,6 +774,7 @@
     var righe = r.voci.filter(function (v) { return v.imposta; }).map(function (v) { return "<tr><td>" + esc(v.voce) + '</td><td class="n">' + E(v.imposta) + "</td></tr>"; }).join("");
     return '<table class="det"><thead><tr><th>Imposta</th><th class="n">Importo</th></tr></thead><tbody>' + (righe || '<tr><td colspan="2" class="muted">Nessuna imposta dovuta</td></tr>') +
       '<tr class="tot"><td>Totale imposte dell\'anno (saldo)</td><td class="n">' + E(r.imposte) + "</td></tr></tbody></table>" +
+      (r.ivacaSottoSoglia ? '<p class="small" style="margin:6px 0 0">IVACA calcolata ' + E(r.ivacaCalcolata) + ": non supera " + Z.SOGLIA_IVACA + " € e non si versa (quadro RW comunque da compilare).</p>" : "") +
       '<p class="small" style="margin:6px 0 0">Saldo ' + r.anno + " entro il " + D.it(r.termini.saldo) + ". RT: plusvalenze " + E(r.rt.plusvalenze) + (r.rt.franchigia ? " − franchigia " + E(r.rt.franchigia, 0) : "") + " × " + Math.round(r.rt.aliquota * 100) + "%. " + esc(r.rt.nota) + " Gli acconti dell\'anno successivo si calcolano a parte.</p>";
   }
   function tabellaAnnoDettaglio(r) {
