@@ -162,7 +162,10 @@
             m.valore = abs(v.q) * p.eur; m.fonteValore = "stimato: " + p.fonte; fatto = true; return true;
           });
         }
-        if (fatto) { m.valoreStimato = true; stimati++; } else if (m.voci.some(function (v) { return v.lato !== "fee"; })) senza++;
+        if (fatto) { delete m.prezzoMancante; m.valoreStimato = true; stimati++; } else if (m.voci.some(function (v) { return v.lato !== "fee"; })) {
+          m.prezzoMancante = m.tipo !== "transfer";
+          senza++;
+        }
       }
       if (!m.valoreFee) {
         var f = m.voci.filter(function (v) { return v.lato === "fee"; })[0];
@@ -184,8 +187,8 @@
         var futuro = x[2] > adesso, gp = futuro ? adesso : x[2], usato = null;
         var avvisi = [], saldi = Object.keys(q).sort().filter(function (s) { return q[s] > 0n && D.FIAT.indexOf(s) < 0; }).map(function (s) {
           var p = prezzoEntro(s, gp), n = D.decNum(q[s]); if (p && (!usato || p.giorno < usato)) usato = p.giorno;
-          if (!p) avvisi.push(s + ": prezzo al " + gp.split("-").reverse().join("/") + " non trovato, valore zero da completare");
-          return { attivo: s, simbolo: s, tipo: USD_STABLE.indexOf(norm(s)) >= 0 || EUR_STABLE.indexOf(norm(s)) >= 0 ? "stablecoin" : "cripto", quantita: n, quantitaTesto: D.decStr(q[s]), costo: null, valore: p ? n * p.eur : 0, descrizione: p ? p.fonte : "prezzo mancante" };
+          if (!p) avvisi.push(s + ": prezzo al " + gp.split("-").reverse().join("/") + " non trovato, valore da completare");
+          return { attivo: s, simbolo: s, tipo: USD_STABLE.indexOf(norm(s)) >= 0 || EUR_STABLE.indexOf(norm(s)) >= 0 ? "stablecoin" : "cripto", quantita: n, quantitaTesto: D.decStr(q[s]), costo: null, valore: p ? n * p.eur : null, prezzoMancante: !p, descrizione: p ? p.fonte : "prezzo mancante" };
         });
         var negativi = Object.keys(q).filter(function (s) { return q[s] < 0n && D.FIAT.indexOf(s) < 0; });
         if (negativi.length) avvisi.push("Saldi negativi (mancano movimenti in entrata): " + negativi.join(", ") + ".");
