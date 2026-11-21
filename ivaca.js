@@ -16,7 +16,7 @@
   /* prezzo medio per simbolo da un report Koinly di saldi (valore / quantità) */
   function prezziReport(saldi) {
     var rep = {};
-    (saldi || []).forEach(function (s) { if (s.tipo !== "fiat" && s.quantita) { var r = rep[s.simbolo] || (rep[s.simbolo] = { q: 0, v: 0 }); r.q += s.quantita; r.v += s.valore || 0; } });
+    (saldi || []).forEach(function (s) { if (s.tipo !== "fiat" && s.quantita && !s.prezzoMancante) { var r = rep[s.simbolo] || (rep[s.simbolo] = { q: 0, v: 0 }); r.q += s.quantita; r.v += s.valore || 0; } });
     var out = {}; Object.keys(rep).forEach(function (k) { if (rep[k].q > 0) out[k] = rep[k].v / rep[k].q; });
     return out;
   }
